@@ -33,12 +33,40 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint (before rate limiting)
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  console.log('🏥 Health check requested');
+  
+  let dbStatus = 'disconnected';
+  try {
+    await sequelize.authenticate();
+    dbStatus = 'connected';
+  } catch (error) {
+    dbStatus = 'error: ' + error.message;
+  }
+  
   res.status(200).json({
     success: true,
     message: 'EgyTravel Auth Service is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT,
+    uptime: Math.floor(process.uptime()),
+    database: dbStatus,
+    version: '1.0.0'
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'EgyTravel Authentication API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth/*',
+      users: '/api/users/*'
+    }
   });
 });
 
@@ -89,21 +117,52 @@ app.use((err, req, res, next) => {
 // Database connection and server startup
 const startServer = async () => {
   try {
-    // Initialize database models
-    const { syncDatabase } = require('./src/models/sql/index');
-    await syncDatabase();
+    console.log('🚀 Starting EgyTravel Auth Server...');
+    console.log('📊 Environment:', process.env.NODE_ENV || 'development');
+    console.log('🔌 Port:', PORT);
+    
+    // Log environment variables (without sensitive data)
+    console.log('🔧 Database Host:', process.env.DB_HOST ? 'Set' : 'Missing');
+    console.log('🔧 Database Port:', process.env.DB_PORT ? 'Set' : 'Missing');
+    console.log('🔧 Database Name:', process.env.DB_NAME ? 'Set' : 'Missing');
+    console.log('🔧 JWT Secret:', process.env.JWT_SECRET ? 'Set' : 'Missing');
+    
+    // Start server first (so health check works)
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ EgyTravel Auth Server running on port ${PORT}`);
+      console.log(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`✅ Health check available at: /health`);
+      logger.info(`EgyTravel Auth Server running on port ${PORT}`);
+    });
+
+    // Handle server errors
+    server.on('error', (error) => {
+      console.error('❌ Server error:', error);
+      logger.error('Server error:', error);
+      process.exit(1);
+    });
+
+    // Try to connect to database after server starts
+    try {
+      console.log('🔄 Attempting database connection...');
+      const { syncDatabase } = require('./src/models/sql/index');
+      await syncDatabase();
+      console.log('✅ Database connected successfully');
+    } catch (dbError) {
+      console.error('⚠️ Database connection failed:', dbError.message);
+      console.log('🔄 Server will continue running without database');
+      console.log('📝 Check your environment variables in Railway dashboard');
+    }
     
     // Connect to MongoDB (optional)
-    await connectMongoDB();
-    
-    // Start server
-    app.listen(PORT, () => {
-      logger.info(`EgyTravel Auth Server running on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV}`);
-      logger.info(`Health check available at: http://localhost:${PORT}/health`);
-    });
+    try {
+      await connectMongoDB();
+    } catch (mongoError) {
+      console.log('ℹ️ MongoDB connection skipped:', mongoError.message);
+    }
     
   } catch (error) {
+    console.error('❌ Failed to start server:', error);
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
