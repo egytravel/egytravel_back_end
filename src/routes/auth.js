@@ -30,12 +30,16 @@ router.post('/register', authRateLimit, validateRegistration, async (req, res) =
       role
     });
 
+    // Return response in your desired format
     res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
+      code: 201,
+      message: 'REGISTRATION SUCCESSFUL',
       data: {
-        user: result.user,
-        tokens: result.tokens
+        token: result.tokens.accessToken,
+        user_id: result.user.user_id,
+        name: result.user.name,
+        email: result.user.email,
+        role: result.user.role
       }
     });
   } catch (error) {
@@ -43,20 +47,16 @@ router.post('/register', authRateLimit, validateRegistration, async (req, res) =
 
     if (error.message.includes('already exists')) {
       return res.status(409).json({
-        success: false,
-        error: {
-          code: 'USER_EXISTS',
-          message: 'A user with this email already exists'
-        }
+        code: 409,
+        message: 'USER ALREADY EXISTS',
+        data: null
       });
     }
 
     res.status(500).json({
-      success: false,
-      error: {
-        code: 'REGISTRATION_FAILED',
-        message: 'Registration failed. Please try again.'
-      }
+      code: 500,
+      message: 'REGISTRATION FAILED',
+      data: null
     });
   }
 });
@@ -72,12 +72,16 @@ router.post('/login', authRateLimit, validateLogin, async (req, res) => {
 
     const result = await AuthService.login(email, password);
 
+    // Return response in your desired format
     res.json({
-      success: true,
-      message: 'Login successful',
+      code: 200,
+      message: 'LOGIN SUCCESSFUL',
       data: {
-        user: result.user,
-        tokens: result.tokens
+        token: result.tokens.accessToken,
+        user_id: result.user.user_id,
+        name: result.user.name,
+        email: result.user.email,
+        role: result.user.role
       }
     });
   } catch (error) {
@@ -85,20 +89,16 @@ router.post('/login', authRateLimit, validateLogin, async (req, res) => {
 
     if (error.message.includes('Invalid email or password')) {
       return res.status(401).json({
-        success: false,
-        error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password'
-        }
+        code: 401,
+        message: 'INVALID CREDENTIALS',
+        data: null
       });
     }
 
     res.status(500).json({
-      success: false,
-      error: {
-        code: 'LOGIN_FAILED',
-        message: 'Login failed. Please try again.'
-      }
+      code: 500,
+      message: 'LOGIN FAILED',
+      data: null
     });
   }
 });

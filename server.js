@@ -10,9 +10,12 @@ const sequelize = require('./src/config/database');
 const connectMongoDB = require('./src/config/mongodb');
 const logger = require('./src/utils/logger');
 
-// Import routes (placeholders for now)
+// Import routes
 const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/users');
+const hotelRoutes = require('./src/routes/hotels');
+const bookingRoutes = require('./src/routes/bookings');
+const favoriteRoutes = require('./src/routes/favorites');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -65,7 +68,10 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       auth: '/api/auth/*',
-      users: '/api/users/*'
+      users: '/api/users/*',
+      hotels: '/api/hotels/*',
+      bookings: '/api/bookings/*',
+      favorites: '/api/favorites/*'
     }
   });
 });
@@ -86,6 +92,9 @@ const limiter = rateLimit({
 // API routes with rate limiting
 app.use('/api/auth', limiter, authRoutes);
 app.use('/api/users', limiter, userRoutes);
+app.use('/api/hotels', hotelRoutes); // Hotels have their own rate limiting
+app.use('/api/bookings', limiter, bookingRoutes);
+app.use('/api/favorites', limiter, favoriteRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
