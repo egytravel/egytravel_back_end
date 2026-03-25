@@ -16,19 +16,16 @@ const Favorite = sequelize.define('Favorite', {
       key: 'user_id'
     }
   },
-  
-  // Universal fields for any favorited item
   item_type: {
     type: DataTypes.ENUM('hotel', 'place', 'itinerary', 'activity', 'restaurant', 'attraction', 'trip'),
-    allowNull: false
+    allowNull: false,
+    comment: 'Type of item being favorited'
   },
   item_id: {
     type: DataTypes.STRING(200),
     allowNull: false,
-    comment: 'External ID (e.g., Booking.com hotel_id) or internal ID'
+    comment: 'External ID of the favorited item'
   },
-  
-  // Cached item details
   item_name: {
     type: DataTypes.STRING(300),
     allowNull: true
@@ -48,14 +45,12 @@ const Favorite = sequelize.define('Favorite', {
   item_data: {
     type: DataTypes.JSON,
     allowNull: true,
-    comment: 'Flexible storage for any additional data'
+    comment: 'Additional item-specific data (pricing, amenities, etc.)'
   },
-  
-  // Metadata
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,
-    comment: 'User personal notes about this favorite'
+    comment: 'User notes about this favorite'
   },
   tags: {
     type: DataTypes.STRING(500),

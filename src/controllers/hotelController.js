@@ -1,4 +1,4 @@
-const bookingcomService = require('../services/bookingcomService');
+const amadeusService = require('../services/amadeusService');
 const cacheService = require('../services/cacheService');
 const { isValidDate, isValidDateRange, isPositiveInteger } = require('../utils/validators');
 const logger = require('../utils/logger');
@@ -89,10 +89,10 @@ exports.searchHotels = async (req, res) => {
     }
     
     const searchParams = {
-      location,
+      cityCode: location.toUpperCase(), // Amadeus uses IATA codes (CAI, LUX, ASW)
       checkin,
-      checkout: checkout || checkin, // Default to same day if not provided
-      guests: guestsNum,
+      checkout: checkout || checkin,
+      adults: guestsNum,
       rooms: roomsNum
     };
     
@@ -101,24 +101,24 @@ exports.searchHotels = async (req, res) => {
     if (cachedResults) {
       logger.info('Hotel search - cache hit', { searchParams });
       return res.json({
-        success: true,
-        data: cachedResults,
-        cached: true
+        code: 200,
+        message: 'HOTELS FOUND',
+        data: cachedResults
       });
     }
     
-    // Call Booking.com API
-    logger.info('Hotel search - calling API', { searchParams });
-    const results = await bookingcomService.searchHotels(searchParams);
+    // Call Amadeus API
+    logger.info('Hotel search - calling Amadeus API', { searchParams });
+    const results = await amadeusService.searchHotels(searchParams);
     
     // Cache the results
     cacheService.setSearchResults(searchParams, results);
     
     // Return results
     res.json({
-      success: true,
-      data: results,
-      cached: false
+      code: 200,
+      message: 'HOTELS FOUND',
+      data: results
     });
     
   } catch (error) {
@@ -208,7 +208,7 @@ exports.getHotelDetails = async (req, res) => {
     const params = {
       checkin: checkin || new Date().toISOString().split('T')[0],
       checkout: checkout || new Date(Date.now() + 86400000).toISOString().split('T')[0],
-      guests: guests ? parseInt(guests) : 2,
+      adults: guests ? parseInt(guests) : 2,
       rooms: rooms ? parseInt(rooms) : 1
     };
     
@@ -217,15 +217,15 @@ exports.getHotelDetails = async (req, res) => {
     if (cachedDetails) {
       logger.info('Hotel details - cache hit', { hotelId });
       return res.json({
-        success: true,
-        data: cachedDetails,
-        cached: true
+        code: 200,
+        message: 'HOTEL DETAILS FOUND',
+        data: cachedDetails
       });
     }
     
-    // Call Booking.com API
-    logger.info('Hotel details - calling API', { hotelId, params });
-    const details = await bookingcomService.getHotelDetails(hotelId, params);
+    // Call Amadeus API
+    logger.info('Hotel details - calling Amadeus API', { hotelId, params });
+    const details = await amadeusService.getHotelDetails(hotelId, params);
     
     // Cache the details
     cacheService.setHotelDetails(hotelId, details, params);

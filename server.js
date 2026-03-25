@@ -13,7 +13,9 @@ const logger = require('./src/utils/logger');
 // Import routes
 const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/users');
+const homeRoutes = require('./src/routes/home');
 const hotelRoutes = require('./src/routes/hotels');
+const flightRoutes = require('./src/routes/flights');
 const bookingRoutes = require('./src/routes/bookings');
 const favoriteRoutes = require('./src/routes/favorites');
 
@@ -69,7 +71,9 @@ app.get('/', (req, res) => {
       health: '/health',
       auth: '/api/auth/*',
       users: '/api/users/*',
+      home: '/api/home/*',
       hotels: '/api/hotels/*',
+      flights: '/api/flights/*',
       bookings: '/api/bookings/*',
       favorites: '/api/favorites/*'
     }
@@ -92,7 +96,9 @@ const limiter = rateLimit({
 // API routes with rate limiting
 app.use('/api/auth', limiter, authRoutes);
 app.use('/api/users', limiter, userRoutes);
-app.use('/api/hotels', hotelRoutes); // Hotels have their own rate limiting
+app.use('/api/home', homeRoutes);           // Homescreen data (public, no rate limit needed)
+app.use('/api/hotels', hotelRoutes);        // Hotels have their own rate limiting
+app.use('/api/flights', flightRoutes);      // Flights have their own rate limiting
 app.use('/api/bookings', limiter, bookingRoutes);
 app.use('/api/favorites', limiter, favoriteRoutes);
 
