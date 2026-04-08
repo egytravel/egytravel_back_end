@@ -14,6 +14,7 @@ const logger = require('./src/utils/logger');
 const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/users');
 const homeRoutes = require('./src/routes/home');
+const exploreRoutes = require('./src/routes/explore');
 const hotelRoutes = require('./src/routes/hotels');
 const flightRoutes = require('./src/routes/flights');
 const bookingRoutes = require('./src/routes/bookings');
@@ -97,6 +98,7 @@ const limiter = rateLimit({
 app.use('/api/auth', limiter, authRoutes);
 app.use('/api/users', limiter, userRoutes);
 app.use('/api/home', homeRoutes);           // Homescreen data (public, no rate limit needed)
+app.use('/api/explore', exploreRoutes);     // Explore screen data (public)
 app.use('/api/hotels', hotelRoutes);        // Hotels have their own rate limiting
 app.use('/api/flights', flightRoutes);      // Flights have their own rate limiting
 app.use('/api/bookings', limiter, bookingRoutes);

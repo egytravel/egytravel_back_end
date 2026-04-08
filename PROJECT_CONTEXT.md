@@ -1,18 +1,19 @@
 # EgyTravel Backend — Project Context
 > This file is the single source of truth for any developer or Kiro instance joining this project.
 > Read this fully before making any changes.
+> Last updated: after Explore screen APIs added
 
 ---
 
 ## Project Overview
 
 EgyTravel is an Egyptian tourism platform with:
-- Flutter mobile app
-- Web frontend
-- This Node.js/Express backend (this repo)
+- Flutter mobile app (`https://github.com/egytravel/egytravel_flutter`)
+- Web frontend (React — separate repo)
+- This Node.js/Express backend (`https://github.com/egytravel/egytravel_back_end`)
 - A separate ML team's RAG-based AI planner (Groq LLM + custom RAG + filtration)
 
-The backend serves both the Flutter app and the web frontend via REST APIs.
+The backend serves both Flutter and web via REST APIs.
 
 ---
 
@@ -38,28 +39,32 @@ The backend serves both the Flutter app and the web frontend via REST APIs.
 
 ```
 EgyTravel/
-├── server.js                    # Entry point
+├── server.js                    # Entry point — registers all routes
 ├── package.json
 ├── .env                         # Local secrets (NOT committed to git)
 ├── .env.example                 # Template for env vars
 ├── railway.json                 # Railway deployment config
+├── PROJECT_CONTEXT.md           # This file
 ├── src/
 │   ├── config/
 │   │   ├── database.js          # Sequelize MySQL connection
 │   │   ├── mongodb.js           # Mongoose connection
 │   │   ├── amadeus.js           # Amadeus API config
-│   │   ├── bookingcom.js        # Legacy (Booking.com dropped, kept for reference)
+│   │   ├── bookingcom.js        # Legacy (not used)
 │   │   └── jwt.js               # JWT config
 │   ├── controllers/
-│   │   ├── homeController.js    # Homescreen + destinations + map + OpenTripMap
+│   │   ├── homeController.js    # Homescreen + destinations + map + OpenTripMap + Wikipedia
+│   │   ├── exploreController.js # Explore screen (places/restaurants/hotels/flights/map/search)
 │   │   ├── hotelController.js   # Hotel search + details (Amadeus)
 │   │   ├── flightController.js  # Flight search + pricing + locations (Amadeus)
 │   │   ├── bookingController.js # Booking CRUD
 │   │   ├── favoriteController.js# Favorites CRUD
+│   │   ├── tripController.js    # Trip CRUD (partially built)
 │   │   ├── authController.js    # Auth (mostly in routes/auth.js)
 │   │   └── userController.js    # User profile management
 │   ├── data/
-│   │   └── destinations.js      # Curated Egyptian destinations (static, with lat/lng)
+│   │   ├── destinations.js      # Curated Egyptian destinations (static, with lat/lng)
+│   │   └── exploreData.js       # Curated places, restaurants, hotels, flight routes
 │   ├── middleware/
 │   │   ├── auth.js              # JWT authentication middleware
 │   │   ├── roleAuth.js          # Role-based access control
@@ -78,6 +83,7 @@ EgyTravel/
 │   │   ├── auth.js
 │   │   ├── users.js
 │   │   ├── home.js              # All homescreen routes
+│   │   ├── explore.js           # All explore screen routes
 │   │   ├── hotels.js
 │   │   ├── flights.js
 │   │   ├── bookings.js
@@ -90,7 +96,7 @@ EgyTravel/
 │   │   ├── wikipediaService.js  # Wikipedia REST API (free, no key)
 │   │   ├── cacheService.js      # node-cache wrapper (generic + typed methods)
 │   │   ├── emailService.js      # Email (password reset)
-│   │   └── bookingcomService.js # Legacy (not used, kept for reference)
+│   │   └── bookingcomService.js # Legacy (not used)
 │   └── utils/
 │       ├── logger.js            # Winston logger
 │       ├── validators.js        # Date, email, integer validators
@@ -106,7 +112,7 @@ EgyTravel/
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in values. Never commit `.env`.
+Copy `.env.example` to `.env`. Never commit `.env`.
 
 ```env
 # MySQL (Railway)
@@ -122,7 +128,7 @@ JWT_EXPIRES_IN=365d
 
 # Server
 PORT=3000
-NODE_ENV=development               # or production
+NODE_ENV=development
 
 # Security
 BCRYPT_SALT_ROUNDS=12
@@ -134,8 +140,8 @@ AMADEUS_API_KEY=
 AMADEUS_API_SECRET=
 AMADEUS_API_BASE_URL=https://test.api.amadeus.com
 
-# OpenTripMap (free, 1000 req/day)
-OPENTRIPMAP_API_KEY=               # Get from opentripmap.com/product
+# OpenTripMap (free, 1000 req/day — opentripmap.com/product)
+OPENTRIPMAP_API_KEY=
 
 # Cache TTLs (seconds)
 CACHE_TTL_SEARCH=3600
@@ -154,57 +160,34 @@ API_RETRY_DELAY=1000
 
 ```bash
 npm install
-# fill in .env
-npm run dev        # nodemon (auto-restart)
-# or
-node server.js     # plain node
+cp .env.example .env   # fill in credentials
+npm run dev            # nodemon
 
 # If port 3000 is in use (Windows):
 netstat -ano | findstr :3000
 taskkill /PID <PID> /F
 ```
 
-Server starts on `http://localhost:3000`
-
 ---
 
 ## API Response Format
 
-### Standard success response
+### Standard success
 ```json
-{
-  "success": true,
-  "data": { ... }
-}
+{ "success": true, "data": { ... } }
 ```
 
-### Auth endpoints use this format
+### Auth endpoints
 ```json
-{
-  "code": 200,
-  "message": "LOGIN SUCCESSFUL",
-  "data": {
-    "token": "jwt_token_here",
-    "user_id": 1,
-    "name": "Ahmed",
-    "email": "ahmed@example.com",
-    "role": "user"
-  }
-}
+{ "code": 200, "message": "LOGIN SUCCESSFUL", "data": { "token": "...", "user_id": 1, "name": "Ahmed", "email": "...", "role": "user" } }
 ```
 
-### Error response
+### Error
 ```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human readable message"
-  }
-}
+{ "success": false, "error": { "code": "ERROR_CODE", "message": "Human readable message" } }
 ```
 
-### Authentication header (for protected routes)
+### Auth header (protected routes)
 ```
 Authorization: Bearer <jwt_token>
 ```
@@ -213,385 +196,264 @@ Authorization: Bearer <jwt_token>
 
 ## Complete API Reference
 
-Base URL: `http://localhost:3000` (dev) or Railway URL (prod)
+Base URL: `http://localhost:3000` (dev) | Railway URL (prod)
 
 ---
 
-### Health Check
+### Health
+```
+GET /health          — server + DB status
+GET /               — API info
+```
 
-| Method | Endpoint | Auth | Description |
+---
+
+### Auth — /api/auth
+
+| Method | Endpoint | Auth | Body |
 |---|---|---|---|
-| GET | `/health` | None | Server + DB status |
-| GET | `/` | None | API info + all endpoints |
+| POST | `/api/auth/register` | None | `{name, email, password, role?}` |
+| POST | `/api/auth/login` | None | `{email, password}` |
+| POST | `/api/auth/logout` | Bearer | — |
+| POST | `/api/auth/refresh` | None | `{refreshToken}` |
+| POST | `/api/auth/forgot-password` | None | `{email}` |
+| POST | `/api/auth/reset-password` | None | `{token, password}` |
+| GET | `/api/auth/me` | Bearer | — |
 
 ---
 
-### Authentication — `/api/auth`
+### Users — /api/users
 
-| Method | Endpoint | Auth | Body | Description |
-|---|---|---|---|---|
-| POST | `/api/auth/register` | None | `{name, email, password, role?}` | Register new user |
-| POST | `/api/auth/login` | None | `{email, password}` | Login, returns JWT |
-| POST | `/api/auth/logout` | Bearer | — | Logout (client removes token) |
-| POST | `/api/auth/refresh` | None | `{refreshToken}` | Refresh access token |
-| POST | `/api/auth/forgot-password` | None | `{email}` | Request password reset |
-| POST | `/api/auth/reset-password` | None | `{token, password}` | Reset password |
-| GET | `/api/auth/me` | Bearer | — | Get current user profile |
-
-**Register response:**
-```json
-{
-  "code": 201,
-  "message": "REGISTRATION SUCCESSFUL",
-  "data": {
-    "token": "eyJ...",
-    "user_id": 1,
-    "name": "Ahmed",
-    "email": "ahmed@example.com",
-    "role": "user"
-  }
-}
-```
+| Method | Endpoint | Auth |
+|---|---|---|
+| GET | `/api/users/profile` | Bearer |
+| PUT | `/api/users/profile` | Bearer |
+| POST | `/api/users/change-password` | Bearer |
+| GET | `/api/users/admin/users` | Bearer + Admin |
+| PUT | `/api/users/admin/users/:userId/role` | Bearer + Admin |
+| DELETE | `/api/users/admin/users/:userId` | Bearer + Admin |
 
 ---
 
-### Users — `/api/users`
+### Homescreen — /api/home (all public)
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| GET | `/api/users/profile` | Bearer | Get user profile |
-| PUT | `/api/users/profile` | Bearer | Update profile |
-| PUT | `/api/users/password` | Bearer | Change password |
-| DELETE | `/api/users/account` | Bearer | Delete account |
+| Endpoint | Query Params | Description |
+|---|---|---|
+| `GET /api/home` | — | Full homescreen (featured + popular + cities) |
+| `GET /api/home/search` | `q` | Search curated destinations |
+| `GET /api/home/destinations` | `category`, `city`, `featured`, `popular` | All destinations |
+| `GET /api/home/destinations/:id` | — | Detail + Wikipedia enrichment |
+| `GET /api/home/cities` | — | City cards |
+| `GET /api/home/map/markers` | `category?`, `city?` | Map pins |
+| `GET /api/home/map/search` | `q`, `category?`, `city?` | Search + mapView camera |
+| `GET /api/home/places/search` | `q` | Live OpenTripMap search |
+| `GET /api/home/places/city/:cityId` | `limit?` | Real city attractions |
+| `GET /api/home/places/:xid` | — | Real place detail + Wikipedia |
 
----
-
-### Homescreen — `/api/home`
-
-All public, no auth required.
-
-| Method | Endpoint | Query Params | Description |
-|---|---|---|---|
-| GET | `/api/home` | — | Full homescreen payload (featured + popular + cities) |
-| GET | `/api/home/search` | `q` (min 2 chars) | Search curated destinations |
-| GET | `/api/home/destinations` | `category`, `city`, `featured`, `popular` | All destinations with filters |
-| GET | `/api/home/destinations/:id` | — | Single destination detail + Wikipedia enrichment |
-| GET | `/api/home/cities` | — | City cards for Destination section |
-| GET | `/api/home/map/markers` | `category?`, `city?` | Lightweight map pins (lat/lng + name) |
-| GET | `/api/home/map/search` | `q`, `category?`, `city?` | Search + mapView camera position |
-| GET | `/api/home/places/search` | `q` (min 2 chars) | Live search via OpenTripMap (Egypt only) |
-| GET | `/api/home/places/city/:cityId` | `limit?` (default 15) | Real attractions for a city |
-| GET | `/api/home/places/:xid` | — | Full place detail + Wikipedia enrichment |
-
-**Available cityId values:** `cairo`, `luxor`, `aswan`, `sharm-el-sheikh`, `hurghada`, `alexandria`, `dahab`, `siwa`
-
-**Available categories:** `landmark`, `historical`, `beach`, `nature`, `city`
-
-**`GET /api/home` response shape:**
-```json
-{
-  "success": true,
-  "data": {
-    "featured": [...],      // Hero slider cards (5 items)
-    "popular": [...],       // Popular Places section (8 items)
-    "destinations": [...]   // City cards (6 cities)
-  }
-}
-```
-
-**Destination object shape:**
-```json
-{
-  "id": "valley-of-kings",
-  "name": "Valley of the Kings",
-  "location": "Luxor",
-  "city": "Luxor",
-  "cityCode": "LXR",
-  "country": "Egypt",
-  "lat": 25.7402,
-  "lng": 32.6014,
-  "description": "Full description...",
-  "shortDescription": "Short version...",
-  "images": ["url1", "url2", "url3"],
-  "coverImage": "url",
-  "rating": 4.8,
-  "reviewCount": 12300,
-  "pricePerPerson": 300,
-  "currency": "USD",
-  "category": "historical",
-  "tags": ["pharaohs", "tombs", "UNESCO"],
-  "facilities": ["Guided Tours", "Visitor Center"],
-  "weather": { "temp": 30, "unit": "C", "condition": "Sunny" },
-  "featured": true,
-  "popular": true,
-  "openingHours": "6:00 AM - 5:00 PM",
-  "bestTimeToVisit": "October to March",
-  "wikipedia": {                          // Added by Wikipedia enrichment
-    "title": "Valley of the Kings",
-    "url": "https://en.wikipedia.org/...",
-    "thumbnail": "https://...",
-    "originalImage": "https://...",
-    "coordinates": { "lat": 25.74, "lng": 32.60 }
-  }
-}
-```
-
-**Map search response:**
-```json
-{
-  "success": true,
-  "count": 2,
-  "mapView": { "lat": 25.74, "lng": 32.60, "zoom": 13 },
-  "data": [{ "id": "...", "lat": 25.74, "lng": 32.60, ... }]
-}
-```
+cityId values: `cairo`, `luxor`, `aswan`, `sharm-el-sheikh`, `hurghada`, `alexandria`, `dahab`, `siwa`
 
 ---
 
-### Hotels — `/api/hotels`
+### Explore Screen — /api/explore (all public)
 
-Uses Amadeus API. Public endpoints.
+| Endpoint | Query Params | Description |
+|---|---|---|
+| `GET /api/explore` | — | Full explore screen (places + recommended + restaurants + hotels + flights) |
+| `GET /api/explore/places` | `category?`, `limit?` | Places filtered by category |
+| `GET /api/explore/places/:id` | — | Single place detail |
+| `GET /api/explore/restaurants` | `city?`, `category?`, `limit?` | Restaurants |
+| `GET /api/explore/restaurants/:id` | — | Single restaurant detail |
+| `GET /api/explore/hotels` | `city?`, `category?` | Curated hotels |
+| `GET /api/explore/flights` | — | Popular Egyptian routes |
+| `GET /api/explore/map` | `type?` (places/restaurants/hotels/all) | All items as map pins |
+| `GET /api/explore/search` | `q`, `type?` | Search across all types |
 
-| Method | Endpoint | Query Params | Description |
-|---|---|---|---|
-| GET | `/api/hotels/search` | `location`*, `checkin`*, `checkout`, `guests`, `rooms` | Search hotels by city |
-| GET | `/api/hotels/:hotelId` | `checkin`, `checkout`, `guests`, `rooms` | Hotel details + room offers |
+Place categories: `Recent`, `Historical`, `Beaches`, `Religious`, `Entertainment`, `Nature & Adventure`
 
-- `location` = IATA city code: `CAI` (Cairo), `LXR` (Luxor), `ASW` (Aswan), `SSH` (Sharm), `HRG` (Hurghada), `ALY` (Alexandria)
-- Dates format: `YYYY-MM-DD`
-- Rate limit: 50 requests per 15 minutes per IP
+Place IDs: `pyramids-of-giza`, `valley-of-the-kings`, `karnak-temple`, `naama-bay`, `blue-hole-dahab`, `saint-catherine`, `cairo-festival-city`, `white-desert-explore`, `abu-simbel-explore`, `hurghada-beach`
 
-**Hotel search response:**
-```json
-{
-  "code": 200,
-  "message": "HOTELS FOUND",
-  "data": [
-    {
-      "hotelId": "MCLONGHM",
-      "name": "Hotel Name",
-      "location": "CAI, EG",
-      "address": "Street address",
-      "rating": 4,
-      "price": { "amount": 120.00, "currency": "USD", "perNight": true },
-      "amenities": ["WIFI", "POOL"],
-      "available": true,
-      "offerId": "offer_id",
-      "latitude": 30.04,
-      "longitude": 31.23
-    }
-  ]
-}
-```
+Restaurant IDs: `abou-el-sid`, `andrea-mariouteya`, `ovio-maadi`, `fish-market-alex`, `sofra-luxor`, `koshary-el-tahrir`
 
 ---
 
-### Flights — `/api/flights`
+### Hotels — /api/hotels (public)
 
-Uses Amadeus API. Public endpoints.
+| Endpoint | Query Params | Description |
+|---|---|---|
+| `GET /api/hotels/search` | `location`*, `checkin`*, `checkout`, `guests`, `rooms` | Amadeus hotel search |
+| `GET /api/hotels/:hotelId` | `checkin`, `checkout`, `guests`, `rooms` | Hotel details |
 
-| Method | Endpoint | Params | Description |
-|---|---|---|---|
-| GET | `/api/flights/search` | `origin`*, `destination`*, `departureDate`*, `returnDate?`, `adults?`, `travelClass?` | Search flights |
-| POST | `/api/flights/price` | body: `{flightOffer}` | Get exact pricing for a flight offer |
-| GET | `/api/flights/locations` | `keyword` (min 2 chars) | Search Egyptian airports/cities |
-
-- `travelClass` options: `ECONOMY`, `PREMIUM_ECONOMY`, `BUSINESS`, `FIRST`
-- Rate limit: 50 requests per 15 minutes per IP
-
-**Flight search response:**
-```json
-{
-  "code": 200,
-  "message": "FLIGHTS FOUND",
-  "data": [
-    {
-      "flightId": "1",
-      "airline": "MS",
-      "flightNumber": "MS777",
-      "departure": { "airport": "CAI", "terminal": "1", "time": "2025-04-01T08:00:00", "city": "CAI" },
-      "arrival": { "airport": "LHR", "terminal": "2", "time": "2025-04-01T12:00:00", "city": "LHR" },
-      "duration": "PT6H",
-      "stops": 0,
-      "cabinClass": "ECONOMY",
-      "price": { "amount": 450.00, "currency": "USD" },
-      "seats": 9,
-      "offerId": "1"
-    }
-  ]
-}
-```
+location = IATA code: `CAI`, `LXR`, `ASW`, `SSH`, `HRG`, `ALY`
+Dates: `YYYY-MM-DD`
 
 ---
 
-### Bookings — `/api/bookings`
+### Flights — /api/flights (public)
 
-All routes require `Authorization: Bearer <token>`.
+| Endpoint | Params | Description |
+|---|---|---|
+| `GET /api/flights/search` | `origin`*, `destination`*, `departureDate`*, `returnDate?`, `adults?`, `travelClass?` | Amadeus flight search |
+| `POST /api/flights/price` | body: `{flightOffer}` | Exact pricing |
+| `GET /api/flights/locations` | `keyword` | Egyptian airports/cities |
 
-| Method | Endpoint | Body / Query | Description |
+travelClass: `ECONOMY`, `PREMIUM_ECONOMY`, `BUSINESS`, `FIRST`
+
+---
+
+### Bookings — /api/bookings (all require Bearer token)
+
+| Method | Endpoint | Body/Query | Description |
 |---|---|---|---|
 | POST | `/api/bookings/hotel` | `{hotelId, hotelName, hotelLocation, checkinDate, checkoutDate, guests, rooms, tripId?, totalPrice, currency}` | Save hotel booking |
-| GET | `/api/bookings` | `?tripId=&status=` | Get user's bookings |
-| GET | `/api/bookings/:bookingId` | — | Get single booking |
+| GET | `/api/bookings` | `?tripId=&status=&type=` | Get user bookings |
+| GET | `/api/bookings/:bookingId` | — | Single booking |
 | PUT | `/api/bookings/:bookingId` | `{status?, bookingReference?, notes?}` | Update booking |
 | DELETE | `/api/bookings/:bookingId` | — | Delete booking |
 
-- `status` values: `pending`, `confirmed`, `cancelled`, `completed`
-- `booking_type` values: `hotel`, `flight`, `activity`, `transport`
+status values: `pending`, `confirmed`, `cancelled`, `completed`
 
 ---
 
-### Favorites — `/api/favorites`
+### Favorites — /api/favorites (all require Bearer token)
 
-All routes require `Authorization: Bearer <token>`.
-
-| Method | Endpoint | Body / Query | Description |
+| Method | Endpoint | Body/Query | Description |
 |---|---|---|---|
-| POST | `/api/favorites/hotel` | `{hotelId, hotelName, location, imageUrl, priceData, description?, notes?, tags?}` | Add hotel to favorites |
-| GET | `/api/favorites` | `?type=hotel` | Get user's favorites |
-| DELETE | `/api/favorites/:favoriteId` | — | Remove from favorites |
+| POST | `/api/favorites/hotel` | `{hotelId, hotelName, location, imageUrl, priceData, description?, notes?, tags?}` | Add to favorites |
+| GET | `/api/favorites` | `?type=hotel` | Get favorites |
+| DELETE | `/api/favorites/:favoriteId` | — | Remove favorite |
 
-- `item_type` values: `hotel`, `place`, `itinerary`, `activity`, `restaurant`, `attraction`, `trip`
+item_type values: `hotel`, `place`, `itinerary`, `activity`, `restaurant`, `attraction`, `trip`
 
 ---
 
 ## Database Schema (MySQL)
 
 ### users
-| Column | Type | Notes |
-|---|---|---|
-| user_id | INT PK AUTO_INCREMENT | |
-| name | VARCHAR(100) | |
-| email | VARCHAR(100) UNIQUE | lowercase |
-| password | VARCHAR(255) | bcrypt hashed |
-| role | ENUM('user','admin') | default: user |
-| created_at | TIMESTAMP | |
+| Column | Type |
+|---|---|
+| user_id | INT PK AUTO_INCREMENT |
+| name | VARCHAR(100) |
+| email | VARCHAR(100) UNIQUE |
+| password | VARCHAR(255) bcrypt |
+| role | ENUM('user','admin') |
+| created_at | TIMESTAMP |
 
 ### bookings
-| Column | Type | Notes |
-|---|---|---|
-| booking_id | INT PK | |
-| user_id | INT FK | |
-| trip_id | INT FK NULL | |
-| booking_type | ENUM | hotel/flight/activity/transport |
-| provider | VARCHAR(100) | |
-| booking_url | TEXT | affiliate/redirect link |
-| booking_reference | VARCHAR(200) | confirmation number |
-| status | ENUM | pending/confirmed/cancelled/completed |
-| total_price | DECIMAL(10,2) | |
-| currency | VARCHAR(3) | default USD |
-| hotel_id, hotel_name, hotel_location, hotel_address | various | hotel fields |
-| check_in_date, check_out_date | DATEONLY | |
-| guests, rooms | INT | |
-| flight_id, airline, flight_number | various | flight fields |
-| departure_airport, arrival_airport | VARCHAR | |
-| departure_date, arrival_date | DATETIME | |
-| passengers | INT | |
-| cabin_class | ENUM | economy/premium_economy/business/first |
-| booking_data | JSON | extra provider data |
-| notes | TEXT | |
-| created_at, updated_at | TIMESTAMP | |
+| Column | Type |
+|---|---|
+| booking_id | INT PK |
+| user_id | INT FK |
+| trip_id | INT FK NULL |
+| booking_type | ENUM(hotel/flight/activity/transport) |
+| provider | VARCHAR(100) |
+| booking_url | TEXT |
+| booking_reference | VARCHAR(200) |
+| status | ENUM(pending/confirmed/cancelled/completed) |
+| total_price | DECIMAL(10,2) |
+| currency | VARCHAR(3) |
+| hotel_id, hotel_name, hotel_location, hotel_address | various |
+| check_in_date, check_out_date | DATEONLY |
+| guests, rooms | INT |
+| flight_id, airline, flight_number | various |
+| departure_airport, arrival_airport | VARCHAR |
+| departure_date, arrival_date | DATETIME |
+| passengers | INT |
+| cabin_class | ENUM |
+| booking_data | JSON |
+| notes | TEXT |
+| created_at, updated_at | TIMESTAMP |
 
 ### favorites
-| Column | Type | Notes |
-|---|---|---|
-| favorite_id | INT PK | |
-| user_id | INT FK | |
-| item_type | ENUM | hotel/place/itinerary/activity/restaurant/attraction/trip |
-| item_id | VARCHAR(200) | external ID |
-| item_name | VARCHAR(300) | |
-| item_description | TEXT | |
-| item_image_url | VARCHAR(500) | |
-| item_location | VARCHAR(200) | |
-| item_data | JSON | pricing, amenities, etc. |
-| notes | TEXT | |
-| tags | VARCHAR(500) | comma-separated |
-| saved_at | DATETIME | |
-| UNIQUE(user_id, item_type, item_id) | | prevents duplicates |
+| Column | Type |
+|---|---|
+| favorite_id | INT PK |
+| user_id | INT FK |
+| item_type | ENUM |
+| item_id | VARCHAR(200) |
+| item_name | VARCHAR(300) |
+| item_description | TEXT |
+| item_image_url | VARCHAR(500) |
+| item_location | VARCHAR(200) |
+| item_data | JSON |
+| notes | TEXT |
+| tags | VARCHAR(500) |
+| saved_at | DATETIME |
+| UNIQUE(user_id, item_type, item_id) | |
 
 ### trips
-| Column | Type | Notes |
-|---|---|---|
-| trip_id | INT PK | |
-| user_id | INT FK | |
-| title | VARCHAR(200) | |
-| description | TEXT | |
-| destination | VARCHAR(200) | |
-| start_date, end_date | DATEONLY | |
-| budget | DECIMAL(10,2) | |
-| status | ENUM | planning/confirmed/completed/cancelled |
-| created_at, updated_at | TIMESTAMP | |
+| Column | Type |
+|---|---|
+| trip_id | INT PK |
+| user_id | INT FK |
+| title | VARCHAR(200) |
+| description | TEXT |
+| destination | VARCHAR(200) |
+| start_date, end_date | DATEONLY |
+| budget | DECIMAL(10,2) |
+| status | ENUM(planning/confirmed/completed/cancelled) |
+| created_at, updated_at | TIMESTAMP |
 
 ### password_reset_tokens
-| Column | Type | Notes |
-|---|---|---|
-| id | INT PK | |
-| user_id | INT FK | |
-| token | VARCHAR(255) | hashed |
-| expires_at | DATETIME | |
-| used | BOOLEAN | |
-| created_at | TIMESTAMP | |
+| Column | Type |
+|---|---|
+| id | INT PK |
+| user_id | INT FK |
+| token | VARCHAR(255) hashed |
+| expires_at | DATETIME |
+| used | BOOLEAN |
+| created_at | TIMESTAMP |
 
 ---
 
-## Caching Strategy
+## Caching Strategy (node-cache, resets on restart)
 
-All caching uses `node-cache` (in-memory, resets on server restart).
-
-| Data | TTL | Method |
-|---|---|---|
-| Hotel search results | 1 hour | `cacheService.setSearchResults()` |
-| Hotel details | 2 hours | `cacheService.setHotelDetails()` |
-| Location data | 24 hours | `cacheService.setLocationData()` |
-| OpenTripMap results | 1 hour | `cacheService.set(key, data, 3600)` |
-| OpenTripMap details | 2 hours | `cacheService.set(key, data, 7200)` |
-| Wikipedia summaries | 24 hours | `cacheService.set(key, data, 86400)` |
+| Data | TTL |
+|---|---|
+| Hotel search | 1 hour |
+| Hotel details | 2 hours |
+| Location data | 24 hours |
+| OpenTripMap results | 1 hour |
+| OpenTripMap details | 2 hours |
+| Wikipedia summaries | 24 hours |
 
 ---
 
 ## External APIs
 
-### Amadeus (flights + hotels)
+### Amadeus
 - Docs: https://developers.amadeus.com
-- Current env: TEST (fake data, no real bookings)
-- To go live: apply for production access (requires travel agency registration)
-- Key endpoints used:
-  - `referenceData.locations.hotels.byCity.get` — hotel IDs by city
-  - `shopping.hotelOffersSearch.get` — hotel offers with pricing
-  - `shopping.flightOffersSearch.get` — flight search
-  - `shopping.flightOffers.pricing.post` — exact flight pricing
+- Current: TEST environment (fake data)
+- Production requires travel agency registration
 
-### OpenTripMap (tourist places)
+### OpenTripMap
 - Docs: https://opentripmap.com/docs
-- Free tier: 1000 requests/day
-- No card required
-- Used for: real place search, city attractions, place details
-- Data license: ODbL (can store and use, must credit)
+- Free: 1000 req/day, no card needed
+- License: ODbL (can store and use, must credit)
 
-### Wikipedia REST API (descriptions)
-- Docs: https://en.wikipedia.org/api/rest_v1/
-- Completely free, no key needed
-- Used for: enriching destination and place descriptions + thumbnail images
-- Endpoint: `GET https://en.wikipedia.org/api/rest_v1/page/summary/{title}`
+### Wikipedia REST API
+- Free, no key needed
+- `GET https://en.wikipedia.org/api/rest_v1/page/summary/{title}`
 
 ---
 
-## AI Integration (Planned)
+## AI Integration (Planned — NOT built yet)
 
-The ML team has built:
-- Fine-tuned model on Egyptian tourism data
-- RAG (Retrieval Augmented Generation) system
-- Filtration layer
-- Running on **Groq API** (not self-hosted)
+ML team built: fine-tuned model + RAG system + filtration running on Groq API.
 
-Integration plan:
-1. User submits trip preferences → `POST /api/plans/generate`
-2. Backend queries local places DB (from OpenTripMap seeder — not built yet)
-3. Backend calls Groq API with RAG context
-4. Response includes day-by-day plan with `lat`/`lng` for each place
-5. Frontend renders plan on map with route polylines
+Planned endpoint: `POST /api/plans/generate`
 
-**AI plan response shape (planned):**
+Request body:
+```json
+{
+  "destination": "Luxor",
+  "startDate": "2025-04-01",
+  "endDate": "2025-04-04",
+  "budget": "Medium",
+  "interests": ["Historical", "Culture"]
+}
+```
+
+Response shape (planned):
 ```json
 {
   "planId": "plan_abc123",
@@ -605,7 +467,7 @@ Integration plan:
         { "name": "Sofra Restaurant", "type": "restaurant", "lat": 25.69, "lng": 32.63, "order": 2 }
       ],
       "route": {
-        "waypoints": [{ "lat": 25.71, "lng": 32.65, "label": "Karnak" }, ...],
+        "waypoints": [{ "lat": 25.71, "lng": 32.65, "label": "Karnak" }],
         "totalDistanceKm": 4.2,
         "estimatedDrivingMinutes": 18
       }
@@ -621,65 +483,86 @@ Integration plan:
 
 ---
 
+## Flutter App Screens → API Mapping
+
+| Screen | API Endpoint | Status |
+|---|---|---|
+| Splash / Onboarding | None | Static |
+| Login | `POST /api/auth/login` | ✅ Done |
+| Register | `POST /api/auth/register` | ✅ Done |
+| Forgot Password | `POST /api/auth/forgot-password` | ✅ Done |
+| Home | `GET /api/home` | ✅ Done |
+| Home Detail | `GET /api/home/destinations/:id` | ✅ Done |
+| Explore | `GET /api/explore` | ✅ Done |
+| Explore Places (category) | `GET /api/explore/places?category=` | ✅ Done |
+| Explore Map | `GET /api/explore/map` | ✅ Done |
+| Explore Search | `GET /api/explore/search?q=` | ✅ Done |
+| Hotel Search | `GET /api/hotels/search` | ✅ Done |
+| Hotel Detail | `GET /api/hotels/:hotelId` | ✅ Done |
+| Flight Search | `GET /api/flights/search` | ✅ Done |
+| Bookings Screen | `GET /api/bookings` | ✅ Done |
+| Create Booking | `POST /api/bookings/hotel` | ✅ Done |
+| Favorites | `GET /api/favorites` | ✅ Done |
+| Profile | `GET /api/users/profile` | ✅ Done |
+| Trips (profile) | `GET /api/trips` | ⚠️ Partial |
+| Notifications | `GET /api/notifications` | ❌ Not built |
+| AI Trip Planner | `POST /api/plans/generate` | ❌ Not built |
+| AI Chat | `POST /api/chat` | ❌ Not built |
+| Guide Trip | `POST /api/guides` | ❌ Not built |
+| Reviews | `GET/POST /api/reviews` | ❌ Not built |
+
+---
+
 ## What's Done vs Pending
 
 ### Done ✅
-- JWT authentication (register, login, logout, password reset, profile)
-- Role-based access control (user/admin)
-- Hotel search + details via Amadeus
-- Flight search + pricing + location search via Amadeus
-- Booking CRUD (create, read, update, delete)
+- JWT auth (register, login, logout, password reset, profile)
+- Role-based access (user/admin)
+- Hotel search + details (Amadeus)
+- Flight search + pricing + locations (Amadeus)
+- Booking CRUD
 - Favorites CRUD
-- Homescreen API (featured, popular, cities)
-- Destination detail with Wikipedia enrichment
-- Map markers + map search with camera position
-- OpenTripMap integration (real place search + city attractions + place details)
-- Wikipedia enrichment service
+- Homescreen API (featured, popular, cities, map, OpenTripMap, Wikipedia)
+- Explore screen API (places by category, restaurants, curated hotels, popular flights, map, search)
 - In-memory caching for all external API calls
 - Rate limiting on all search endpoints
 - Winston logging
 
 ### Pending ❌
-- Trip model associations (Task 2.3 in tasks.md)
-- Full booking endpoints (get list, update, delete — partially done)
-- Favorites endpoints (add, list, remove — partially done)
-- OpenTripMap data seeder script (for AI model database)
-- AI planning endpoint (`POST /api/plans/generate`)
-- Groq API integration
-- Affiliate link generator for flights/hotels
-- Payment integration (Stripe for direct payments, affiliate redirects for flights/hotels)
-- Production Amadeus credentials
+- Trips API (controller started, routes not wired)
+- Notifications API
+- Reviews API (for destination detail screen)
+- AI Trip Planner endpoint (`POST /api/plans/generate`)
+- AI Chat endpoint (`POST /api/chat`)
+- Guide Trip endpoint
+- Affiliate link generator for flights
+- OpenTripMap data seeder script
 
 ---
 
 ## Git Workflow
 
 ```bash
-git clone <repo-url>
-cd EgyTravel
+git clone https://github.com/egytravel/egytravel_back_end.git
+cd egytravel_back_end
 npm install
-cp .env.example .env
-# fill in .env with credentials
+cp .env.example .env   # fill in credentials
 npm run dev
 ```
 
-**Branch convention:**
-- `main` — production-ready code
+Branch convention:
+- `main` — production-ready
 - `dev` — active development
 - `feature/feature-name` — new features
 
-**Never commit:**
-- `.env` (already in .gitignore)
-- `node_modules/`
-- `logs/`
+Never commit: `.env`, `node_modules/`, `logs/`
 
 ---
 
-## Known Issues / Notes
+## Known Issues
 
-1. `bookingcomService.js` still exists but is not used — Booking.com was dropped in favor of Amadeus for everything
-2. `src/config/bookingcom.js` still referenced in old code — cacheService.js was updated to remove this dependency
-3. Amadeus is on TEST environment — hotel/flight data is fake. Real data requires production credentials + travel agency registration
-4. MongoDB is connected but no models use it yet — reserved for future features
-5. The `railway.json` deployment config exists but the team is evaluating other hosting options
-6. Wikipedia enrichment fails silently — if Wikipedia has no page for a place, the original data is returned unchanged
+1. `bookingcomService.js` exists but is not used — Booking.com dropped in favor of Amadeus
+2. Amadeus is on TEST environment — data is fake
+3. MongoDB connected but no models use it yet
+4. Wikipedia enrichment fails silently — returns original data if no Wikipedia page found
+5. Trip controller (`src/controllers/tripController.js`) is partially built but routes not registered in server.js yet
