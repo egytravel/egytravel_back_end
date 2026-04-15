@@ -5,6 +5,7 @@ const PasswordResetToken = require('./PasswordResetToken');
 const Trip = require('./Trip');
 const Booking = require('./Booking');
 const Favorite = require('./Favorite');
+const Review = require('./Review');
 
 // Define associations
 
@@ -73,6 +74,19 @@ Favorite.belongsTo(User, {
   onDelete: 'CASCADE'
 });
 
+// Review associations
+Review.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user',
+  onDelete: 'CASCADE'
+});
+
+User.hasMany(Review, {
+  foreignKey: 'user_id',
+  as: 'reviews',
+  onDelete: 'CASCADE'
+});
+
 // Sync database (create tables if they don't exist)
 const syncDatabase = async (force = false) => {
   try {
@@ -96,5 +110,6 @@ module.exports = {
   Trip,
   Booking,
   Favorite,
+  Review,
   syncDatabase
 };
