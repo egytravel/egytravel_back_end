@@ -6,6 +6,9 @@ const Trip = require('./Trip');
 const Booking = require('./Booking');
 const Favorite = require('./Favorite');
 const Review = require('./Review');
+const Post = require('./Post');
+const PostLike = require('./PostLike');
+const PostComment = require('./PostComment');
 
 // Define associations
 
@@ -75,17 +78,20 @@ Favorite.belongsTo(User, {
 });
 
 // Review associations
-Review.belongsTo(User, {
-  foreignKey: 'user_id',
-  as: 'user',
-  onDelete: 'CASCADE'
-});
+Review.belongsTo(User, { foreignKey: 'user_id', as: 'user', onDelete: 'CASCADE' });
+User.hasMany(Review, { foreignKey: 'user_id', as: 'reviews', onDelete: 'CASCADE' });
 
-User.hasMany(Review, {
-  foreignKey: 'user_id',
-  as: 'reviews',
-  onDelete: 'CASCADE'
-});
+// Post associations
+Post.belongsTo(User, { foreignKey: 'user_id', as: 'author', onDelete: 'CASCADE' });
+User.hasMany(Post, { foreignKey: 'user_id', as: 'posts', onDelete: 'CASCADE' });
+
+Post.hasMany(PostLike, { foreignKey: 'post_id', as: 'likes', onDelete: 'CASCADE' });
+PostLike.belongsTo(Post, { foreignKey: 'post_id', as: 'post' });
+PostLike.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+Post.hasMany(PostComment, { foreignKey: 'post_id', as: 'comments', onDelete: 'CASCADE' });
+PostComment.belongsTo(Post, { foreignKey: 'post_id', as: 'post' });
+PostComment.belongsTo(User, { foreignKey: 'user_id', as: 'author', onDelete: 'CASCADE' });
 
 // Sync database (create tables if they don't exist)
 const syncDatabase = async (force = false) => {
@@ -104,12 +110,6 @@ const syncDatabase = async (force = false) => {
 };
 
 module.exports = {
-  sequelize,
-  User,
-  PasswordResetToken,
-  Trip,
-  Booking,
-  Favorite,
-  Review,
-  syncDatabase
+  sequelize, User, PasswordResetToken, Trip, Booking,
+  Favorite, Review, Post, PostLike, PostComment, syncDatabase
 };
