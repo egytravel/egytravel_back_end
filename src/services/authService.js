@@ -264,7 +264,7 @@ class AuthService {
       }
 
       // Only allow certain fields to be updated
-      const allowedFields = ['name'];
+      const allowedFields = ['name', 'phone', 'nationality', 'date_of_birth', 'profile_photo_url'];
       const filteredData = {};
       
       allowedFields.forEach(field => {

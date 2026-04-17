@@ -39,7 +39,12 @@ const User = sequelize.define('User', {
     type: DataTypes.ENUM('user', 'admin'),
     allowNull: true,
     defaultValue: 'user'
-  }
+  },
+  phone: { type: DataTypes.STRING(30), allowNull: true },
+  nationality: { type: DataTypes.STRING(100), allowNull: true },
+  date_of_birth: { type: DataTypes.DATEONLY, allowNull: true },
+  profile_photo_url: { type: DataTypes.STRING(500), allowNull: true },
+  notification_preferences: { type: DataTypes.JSON, allowNull: true, defaultValue: null }
 }, {
   tableName: 'users',
   timestamps: true,
@@ -69,6 +74,9 @@ User.prototype.validatePassword = async function(plainPassword) {
 User.prototype.toJSON = function() {
   const values = { ...this.get() };
   delete values.password;
+  if (!values.notification_preferences) {
+    values.notification_preferences = { push_enabled: true, email_enabled: true };
+  }
   return values;
 };
 

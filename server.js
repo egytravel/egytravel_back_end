@@ -21,6 +21,7 @@ const bookingRoutes = require('./src/routes/bookings');
 const favoriteRoutes = require('./src/routes/favorites');
 const reviewRoutes = require('./src/routes/reviews');
 const communityRoutes = require('./src/routes/community');
+const tripRoutes = require('./src/routes/trips');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -105,6 +106,7 @@ app.use('/api/hotels', hotelRoutes);        // Hotels have their own rate limiti
 app.use('/api/flights', flightRoutes);      // Flights have their own rate limiting
 app.use('/api/bookings', limiter, bookingRoutes);
 app.use('/api/favorites', limiter, favoriteRoutes);
+app.use('/api/trips', limiter, tripRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/community', communityRoutes);
 

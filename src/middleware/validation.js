@@ -109,14 +109,24 @@ const validateChangePassword = [
 
 // Profile update validation
 const validateProfileUpdate = [
-  body('name')
-    .optional()
-    .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Name must be between 2 and 100 characters')
-    .matches(/^[a-zA-Z\s]+$/)
-    .withMessage('Name can only contain letters and spaces'),
-  
+  body('name').optional().trim().isLength({ min: 2, max: 100 }).withMessage('Name must be between 2 and 100 characters').matches(/^[a-zA-Z\s]+$/).withMessage('Name can only contain letters and spaces'),
+  body('phone').optional().trim().matches(/^[\d\s+\-().]+$/).withMessage('Phone can only contain digits, spaces, +, -, (, )').isLength({ max: 30 }).withMessage('Phone must not exceed 30 characters'),
+  body('nationality').optional().trim().isLength({ min: 2, max: 100 }).withMessage('Nationality must be between 2 and 100 characters'),
+  body('date_of_birth').optional().isDate({ format: 'YYYY-MM-DD' }).withMessage('Date of birth must be a valid date in YYYY-MM-DD format'),
+  body('profile_photo_url').optional().trim().isURL().withMessage('Profile photo must be a valid URL').isLength({ max: 500 }).withMessage('Profile photo URL must not exceed 500 characters'),
+  handleValidationErrors
+];
+
+// Delete account validation
+const validateDeleteAccount = [
+  body('password').notEmpty().withMessage('Password confirmation is required'),
+  handleValidationErrors
+];
+
+// Notification preferences validation
+const validateNotificationUpdate = [
+  body('push_enabled').optional().isBoolean().withMessage('push_enabled must be a boolean'),
+  body('email_enabled').optional().isBoolean().withMessage('email_enabled must be a boolean'),
   handleValidationErrors
 ];
 
@@ -169,14 +179,7 @@ const passwordResetRateLimit = rateLimit({
 });
 
 module.exports = {
-  validateRegistration,
-  validateLogin,
-  validateForgotPassword,
-  validateResetPassword,
-  validateChangePassword,
-  validateProfileUpdate,
-  validateRefreshToken,
-  authRateLimit,
-  passwordResetRateLimit,
-  handleValidationErrors
+  validateRegistration, validateLogin, validateForgotPassword, validateResetPassword,
+  validateChangePassword, validateProfileUpdate, validateDeleteAccount, validateNotificationUpdate,
+  validateRefreshToken, authRateLimit, passwordResetRateLimit, handleValidationErrors
 };
