@@ -101,18 +101,6 @@ router.delete('/admin/users/:userId', requireAuth, requireAdmin, async (req, res
 });
 
 module.exports = router;
-const AuthService = require('../services/authService');
-const { User } = require('../models/sql');
-const { 
-  validateProfileUpdate, 
-  validateChangePassword 
-} = require('../middleware/validation');
-const { requireAuth } = require('../middleware/auth');
-const { 
-  requireAdmin, 
-  requireOwnershipOrAdmin,
-  requireOwnProfile 
-} = require('../middleware/roleAuth');
 const logger = require('../utils/logger');
 
 /**
