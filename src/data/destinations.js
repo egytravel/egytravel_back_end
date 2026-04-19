@@ -76,11 +76,11 @@ const destinations = [
     description: 'Abu Simbel is an archaeological site comprising two massive rock-cut temples in the village of Abu Simbel in Aswan Governorate, Upper Egypt. The twin temples were originally carved out of the mountainside in the 13th century BC, during the 19th Dynasty reign of the Pharaoh Ramesses II.',
     shortDescription: 'Magnificent twin temples carved into the mountainside by Ramesses II, relocated to save them from the Nile flood.',
     images: [
-      'https://images.unsplash.com/photo-1562679299-8e5e4b3e3e3e?w=800',
+      'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
       'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
       'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800'
     ],
-    coverImage: 'https://images.unsplash.com/photo-1562679299-8e5e4b3e3e3e?w=800',
+    coverImage: 'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
     rating: 4.6,
     reviewCount: 8900,
     pricePerPerson: 420,
@@ -339,7 +339,7 @@ const cities = [
     country: 'Egypt',
     lat: 24.0889,
     lng: 32.8998,
-    coverImage: 'https://images.unsplash.com/photo-1562679299-8e5e4b3e3e3e?w=800',
+    coverImage: 'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
     description: 'A serene Nile city with Nubian culture, Abu Simbel temples, and Philae Island.',
     attractionsCount: 18,
     rating: 4.6

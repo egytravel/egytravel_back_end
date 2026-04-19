@@ -154,7 +154,7 @@ const places = [
     location: 'Aswan',
     city: 'Aswan',
     cityCode: 'ASW',
-    image: 'https://images.unsplash.com/photo-1562679299-8e5e4b3e3e3e?w=800',
+    image: 'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
     rating: 4.8,
     price: 35,
     priceDisplay: '$35',
