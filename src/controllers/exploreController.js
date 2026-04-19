@@ -1,21 +1,21 @@
-const { places, restaurants, curatedHotels, popularFlightRoutes, placeCategories } = require('../data/exploreData');
+const { places: staticPlaces, restaurants, curatedHotels, popularFlightRoutes } = require('../data/exploreData');
+const openTripMapService = require('../services/openTripMapService');
 const logger = require('../utils/logger');
+
+// Categories available for filtering
+const CATEGORIES = ['All', 'Historical', 'Religious', 'Nature', 'Sea & Water', 'Culture', 'Entertainment', 'Landmarks'];
 
 /**
  * GET /api/explore
- * Full explore screen payload — places, recommended, restaurants, hotels, flights
+ * Full explore screen — static popular places + live data sections
  */
 exports.getExploreData = async (req, res) => {
   try {
-    const recommended = places.filter(p => p.isRecommended);
-    const recent = places.slice(0, 6);
-
     res.json({
       success: true,
       data: {
-        categories: placeCategories,
-        places: recent,                    // Default "Recent" tab
-        recommended,                       // Recommended section
+        categories: CATEGORIES,
+        popularPlaces: staticPlaces,           // Static curated top places
         restaurants: restaurants.slice(0, 4),
         hotels: curatedHotels.slice(0, 4),
         flights: popularFlightRoutes
@@ -28,25 +28,59 @@ exports.getExploreData = async (req, res) => {
 };
 
 /**
- * GET /api/explore/places
- * Get places with optional category filter
- * ?category=Historical|Beaches|Religious|Entertainment|Nature & Adventure|Recent
+ * GET /api/explore/places?category=Historical&city=cairo&limit=40
+ * Live places from OpenTripMap, filtered by category
+ * Falls back to static data if OpenTripMap is unavailable
  */
 exports.getPlaces = async (req, res) => {
   try {
-    const { category, limit } = req.query;
-    const limitNum = parseInt(limit) || 20;
+    const { category = 'All', city, limit = 40 } = req.query;
+    const limitNum = Math.min(parseInt(limit) || 40, 100);
 
-    let results = [...places];
-
-    if (category && category !== 'Recent') {
-      results = results.filter(p => p.category === category);
+    // If city specified, get places near that city
+    if (city) {
+      try {
+        const places = await openTripMapService.getCityPlaces(city.toLowerCase(), category, limitNum);
+        return res.json({
+          success: true,
+          source: 'opentripmap',
+          category,
+          city,
+          count: places.length,
+          categories: CATEGORIES,
+          data: places
+        });
+      } catch (err) {
+        logger.warn('OpenTripMap city places failed, falling back to static', { city, err: err.message });
+      }
     }
 
+    // No city — get places across all Egypt by category
+    try {
+      const places = await openTripMapService.getPlacesByCategory(category, limitNum);
+      return res.json({
+        success: true,
+        source: 'opentripmap',
+        category,
+        count: places.length,
+        categories: CATEGORIES,
+        data: places
+      });
+    } catch (err) {
+      logger.warn('OpenTripMap category search failed, falling back to static', { err: err.message });
+    }
+
+    // Fallback to static data
+    let results = [...staticPlaces];
+    if (category && category !== 'All') {
+      results = results.filter(p => p.category === category);
+    }
     res.json({
       success: true,
-      count: results.slice(0, limitNum).length,
-      categories: placeCategories,
+      source: 'static',
+      category,
+      count: results.length,
+      categories: CATEGORIES,
       data: results.slice(0, limitNum)
     });
   } catch (error) {
@@ -57,18 +91,25 @@ exports.getPlaces = async (req, res) => {
 
 /**
  * GET /api/explore/places/:id
- * Get single place detail
+ * Single place — checks static first, then OpenTripMap
  */
 exports.getPlaceById = async (req, res) => {
   try {
     const { id } = req.params;
-    const place = places.find(p => p.id === id);
 
-    if (!place) {
-      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Place not found' } });
+    // Check static data first
+    const staticPlace = staticPlaces.find(p => p.id === id);
+    if (staticPlace) {
+      return res.json({ success: true, source: 'static', data: staticPlace });
     }
 
-    res.json({ success: true, data: place });
+    // Try OpenTripMap (xid)
+    try {
+      const place = await openTripMapService.getPlaceDetails(id);
+      return res.json({ success: true, source: 'opentripmap', data: place });
+    } catch (err) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Place not found' } });
+    }
   } catch (error) {
     logger.error('Get place by id error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load place' } });
@@ -76,8 +117,7 @@ exports.getPlaceById = async (req, res) => {
 };
 
 /**
- * GET /api/explore/restaurants
- * Get all restaurants with optional city filter
+ * GET /api/explore/restaurants?city=Cairo&category=Egyptian
  */
 exports.getRestaurants = async (req, res) => {
   try {
@@ -100,23 +140,18 @@ exports.getRestaurants = async (req, res) => {
  */
 exports.getRestaurantById = async (req, res) => {
   try {
-    const { id } = req.params;
-    const restaurant = restaurants.find(r => r.id === id);
-
+    const restaurant = restaurants.find(r => r.id === req.params.id);
     if (!restaurant) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Restaurant not found' } });
     }
-
     res.json({ success: true, data: restaurant });
   } catch (error) {
-    logger.error('Get restaurant by id error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load restaurant' } });
   }
 };
 
 /**
- * GET /api/explore/hotels
- * Get curated hotels with optional city/category filter
+ * GET /api/explore/hotels?city=Aswan&category=Luxury
  */
 exports.getCuratedHotels = async (req, res) => {
   try {
@@ -129,62 +164,68 @@ exports.getCuratedHotels = async (req, res) => {
 
     res.json({ success: true, count: results.slice(0, limitNum).length, data: results.slice(0, limitNum) });
   } catch (error) {
-    logger.error('Get curated hotels error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load hotels' } });
   }
 };
 
 /**
  * GET /api/explore/flights
- * Get popular flight routes
  */
 exports.getPopularFlights = async (req, res) => {
   try {
     res.json({ success: true, count: popularFlightRoutes.length, data: popularFlightRoutes });
   } catch (error) {
-    logger.error('Get popular flights error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load flights' } });
   }
 };
 
 /**
- * GET /api/explore/map
- * All explore items as map markers (places + restaurants + hotels)
- * Returns lightweight objects with lat/lng for map pins
+ * GET /api/explore/map?type=places|restaurants|hotels|all&category=Historical
  */
 exports.getExploreMapMarkers = async (req, res) => {
   try {
-    const { type } = req.query; // places | restaurants | hotels | all
+    const { type, category } = req.query;
 
-    const placeMarkers = places.map(p => ({
-      id: p.id, type: 'place', title: p.title, location: p.location,
-      lat: p.lat, lng: p.lng, image: p.image, rating: p.rating,
-      priceDisplay: p.priceDisplay, category: p.category
-    }));
+    let placeMarkers = [];
+
+    // Get live place markers from OpenTripMap
+    try {
+      const livePlaces = await openTripMapService.getPlacesByCategory(category || 'All', 80);
+      placeMarkers = livePlaces.filter(p => p.lat && p.lng).map(p => ({
+        id: p.id, type: 'place', title: p.name, lat: p.lat, lng: p.lng,
+        category: p.category, coverImage: p.coverImage, rating: p.rating, source: 'opentripmap'
+      }));
+    } catch {
+      // Fallback to static
+      placeMarkers = staticPlaces.map(p => ({
+        id: p.id, type: 'place', title: p.title, location: p.location,
+        lat: p.lat, lng: p.lng, category: p.category, coverImage: p.image,
+        rating: p.rating, priceDisplay: p.priceDisplay
+      }));
+    }
 
     const restaurantMarkers = restaurants.map(r => ({
       id: r.id, type: 'restaurant', title: r.title, location: r.location,
-      lat: r.lat, lng: r.lng, image: r.image, rating: r.rating,
-      priceDisplay: r.priceDisplay, category: r.category
+      lat: r.lat, lng: r.lng, category: r.category, coverImage: r.image, rating: r.rating
     }));
 
     const hotelMarkers = curatedHotels.map(h => ({
       id: h.id, type: 'hotel', title: h.title, location: h.location,
-      lat: h.lat, lng: h.lng, image: h.image, rating: h.rating,
-      priceDisplay: h.priceDisplay, category: h.category
+      lat: h.lat, lng: h.lng, category: h.category, coverImage: h.image, rating: h.rating
     }));
 
     let markers = [];
-    if (!type || type === 'all') {
-      markers = [...placeMarkers, ...restaurantMarkers, ...hotelMarkers];
-    } else if (type === 'places') markers = placeMarkers;
+    if (!type || type === 'all') markers = [...placeMarkers, ...restaurantMarkers, ...hotelMarkers];
+    else if (type === 'places') markers = placeMarkers;
     else if (type === 'restaurants') markers = restaurantMarkers;
     else if (type === 'hotels') markers = hotelMarkers;
 
-    // Egypt center as default map view
-    const mapView = { lat: 26.8, lng: 30.8, zoom: 5 };
-
-    res.json({ success: true, count: markers.length, mapView, data: markers });
+    res.json({
+      success: true,
+      count: markers.length,
+      mapView: { lat: 26.8, lng: 30.8, zoom: 5 },
+      data: markers
+    });
   } catch (error) {
     logger.error('Get explore map markers error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load map data' } });
@@ -192,8 +233,7 @@ exports.getExploreMapMarkers = async (req, res) => {
 };
 
 /**
- * GET /api/explore/search?q=pyramids
- * Search across places, restaurants, and hotels
+ * GET /api/explore/search?q=pyramids&type=places
  */
 exports.searchExplore = async (req, res) => {
   try {
@@ -207,31 +247,35 @@ exports.searchExplore = async (req, res) => {
     }
 
     const keyword = q.toLowerCase().trim();
-
-    const matchedPlaces = places.filter(p =>
-      p.title.toLowerCase().includes(keyword) ||
-      p.location.toLowerCase().includes(keyword) ||
-      p.category.toLowerCase().includes(keyword)
-    ).map(p => ({ ...p, type: 'place' }));
-
-    const matchedRestaurants = restaurants.filter(r =>
-      r.title.toLowerCase().includes(keyword) ||
-      r.location.toLowerCase().includes(keyword) ||
-      r.cuisine.toLowerCase().includes(keyword)
-    ).map(r => ({ ...r, type: 'restaurant' }));
-
-    const matchedHotels = curatedHotels.filter(h =>
-      h.title.toLowerCase().includes(keyword) ||
-      h.location.toLowerCase().includes(keyword) ||
-      h.category.toLowerCase().includes(keyword)
-    ).map(h => ({ ...h, type: 'hotel' }));
-
     let results = [];
-    if (!type || type === 'all') {
-      results = [...matchedPlaces, ...matchedRestaurants, ...matchedHotels];
-    } else if (type === 'places') results = matchedPlaces;
-    else if (type === 'restaurants') results = matchedRestaurants;
-    else if (type === 'hotels') results = matchedHotels;
+
+    if (!type || type === 'places' || type === 'all') {
+      // Live search from OpenTripMap
+      try {
+        const livePlaces = await openTripMapService.searchByKeyword(q.trim(), 30);
+        results = [...results, ...livePlaces.map(p => ({ ...p, type: 'place' }))];
+      } catch {
+        // Fallback to static
+        const staticResults = staticPlaces
+          .filter(p => p.title?.toLowerCase().includes(keyword) || p.location?.toLowerCase().includes(keyword))
+          .map(p => ({ ...p, type: 'place' }));
+        results = [...results, ...staticResults];
+      }
+    }
+
+    if (!type || type === 'restaurants' || type === 'all') {
+      const matchedRestaurants = restaurants
+        .filter(r => r.title.toLowerCase().includes(keyword) || r.cuisine?.toLowerCase().includes(keyword))
+        .map(r => ({ ...r, type: 'restaurant' }));
+      results = [...results, ...matchedRestaurants];
+    }
+
+    if (!type || type === 'hotels' || type === 'all') {
+      const matchedHotels = curatedHotels
+        .filter(h => h.title.toLowerCase().includes(keyword) || h.location?.toLowerCase().includes(keyword))
+        .map(h => ({ ...h, type: 'hotel' }));
+      results = [...results, ...matchedHotels];
+    }
 
     res.json({ success: true, count: results.length, data: results });
   } catch (error) {

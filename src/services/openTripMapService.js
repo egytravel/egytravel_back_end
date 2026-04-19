@@ -5,63 +5,106 @@ const logger = require('../utils/logger');
 const BASE_URL = 'https://api.opentripmap.com/0.1/en/places';
 const API_KEY = process.env.OPENTRIPMAP_API_KEY;
 
-// Egypt bounding box — restricts all searches to Egypt only
-const EGYPT_BOUNDS = {
-  lonMin: 24.7,
-  latMin: 21.9,
-  lonMax: 37.2,
-  latMax: 31.7
+// Egypt bounding box
+const EGYPT_BOUNDS = { lonMin: 24.7, latMin: 21.9, lonMax: 37.2, latMax: 31.7 };
+
+// Category → OpenTripMap kinds mapping
+const CATEGORY_KINDS = {
+  'Historical':        'historic,archaeology,cultural,architecture',
+  'Religious':         'religion,churches,monasteries,mosques',
+  'Nature':            'natural,national_parks,nature_reserves,geological_formations',
+  'Sea & Water':       'beaches,water,diving,snorkeling',
+  'Culture':           'museums,theatres_and_entertainments,art_galleries,cultural',
+  'Entertainment':     'amusements,zoos,aquariums,theme_parks',
+  'Landmarks':         'interesting_places,architecture,monuments',
+  'All':               'interesting_places,historic,natural,beaches,religion,museums,cultural'
 };
 
-// Map OpenTripMap kinds to our categories
+// Our category label from OTM kinds
 const KIND_TO_CATEGORY = {
-  historic: 'historical',
-  cultural: 'historical',
-  archaeology: 'historical',
-  architecture: 'landmark',
-  natural: 'nature',
-  beaches: 'beach',
-  water: 'beach',
-  religion: 'landmark',
-  museums: 'landmark',
-  urban_environment: 'city',
-  foods: 'restaurant'
+  historic: 'Historical', cultural: 'Culture', archaeology: 'Historical',
+  architecture: 'Landmarks', natural: 'Nature', beaches: 'Sea & Water',
+  water: 'Sea & Water', religion: 'Religious', museums: 'Culture',
+  churches: 'Religious', monasteries: 'Religious', mosques: 'Religious',
+  national_parks: 'Nature', nature_reserves: 'Nature', monuments: 'Landmarks',
+  interesting_places: 'Landmarks', amusements: 'Entertainment',
+  theatres_and_entertainments: 'Entertainment', art_galleries: 'Culture'
+};
+
+// Egypt city centers
+const CITY_CENTERS = {
+  cairo:             { lat: 30.0444, lng: 31.2357, radius: 20000 },
+  luxor:             { lat: 25.6872, lng: 32.6396, radius: 15000 },
+  aswan:             { lat: 24.0889, lng: 32.8998, radius: 15000 },
+  'sharm-el-sheikh': { lat: 27.9158, lng: 34.3300, radius: 20000 },
+  hurghada:          { lat: 27.2579, lng: 33.8116, radius: 20000 },
+  alexandria:        { lat: 31.2001, lng: 29.9187, radius: 20000 },
+  dahab:             { lat: 28.4912, lng: 34.5131, radius: 15000 },
+  siwa:              { lat: 29.2031, lng: 25.5195, radius: 15000 },
+  'marsa-alam':      { lat: 25.0657, lng: 34.8941, radius: 15000 },
+  'el-gouna':        { lat: 27.3956, lng: 33.6756, radius: 10000 }
 };
 
 /**
- * Search places near a city center by coordinates
- * @param {number} lat - Latitude of city center
- * @param {number} lng - Longitude of city center
- * @param {number} radiusMeters - Search radius in meters
- * @param {string} kinds - OpenTripMap category kinds
- * @param {number} limit - Max results
+ * Get places by category across all of Egypt (bbox search)
+ * Returns up to `limit` places for a given category
  */
-async function searchPlacesNearby({ lat, lng, radiusMeters = 10000, kinds = 'interesting_places', limit = 20 }) {
+async function getPlacesByCategory(category = 'All', limit = 50) {
   if (!API_KEY) throw new Error('OPENTRIPMAP_API_KEY not configured');
 
-  const cacheKey = `otm_nearby_${lat}_${lng}_${radiusMeters}_${kinds}_${limit}`;
+  const kinds = CATEGORY_KINDS[category] || CATEGORY_KINDS['All'];
+  const cacheKey = `otm_cat_${category}_${limit}`;
   const cached = cacheService.get(cacheKey);
   if (cached) return cached;
 
   try {
-    const response = await axios.get(`${BASE_URL}/radius`, {
+    const response = await axios.get(`${BASE_URL}/bbox`, {
       params: {
-        radius: radiusMeters,
-        lon: lng,
-        lat: lat,
+        lon_min: EGYPT_BOUNDS.lonMin,
+        lat_min: EGYPT_BOUNDS.latMin,
+        lon_max: EGYPT_BOUNDS.lonMax,
+        lat_max: EGYPT_BOUNDS.latMax,
         kinds,
         limit,
         format: 'json',
         apikey: API_KEY
       },
-      timeout: 10000
+      timeout: 15000
     });
 
-    const places = response.data
-      .filter(p => p.name && p.name.trim() !== '') // skip unnamed places
-      .map(formatBasicPlace);
+    const places = (response.data || [])
+      .filter(p => p.name && p.name.trim() !== '')
+      .map(p => formatBasicPlace(p, category));
 
-    cacheService.set(cacheKey, places, 3600); // cache 1 hour
+    cacheService.set(cacheKey, places, 3600);
+    return places;
+  } catch (error) {
+    logger.error('OpenTripMap category search failed', { category, error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * Get places near a city center
+ */
+async function searchPlacesNearby({ lat, lng, radiusMeters = 15000, kinds = 'interesting_places', limit = 30 }) {
+  if (!API_KEY) throw new Error('OPENTRIPMAP_API_KEY not configured');
+
+  const cacheKey = `otm_nearby_${lat}_${lng}_${kinds}_${limit}`;
+  const cached = cacheService.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await axios.get(`${BASE_URL}/radius`, {
+      params: { radius: radiusMeters, lon: lng, lat, kinds, limit, format: 'json', apikey: API_KEY },
+      timeout: 12000
+    });
+
+    const places = (response.data || [])
+      .filter(p => p.name && p.name.trim() !== '')
+      .map(p => formatBasicPlace(p));
+
+    cacheService.set(cacheKey, places, 3600);
     return places;
   } catch (error) {
     logger.error('OpenTripMap nearby search failed', { error: error.message });
@@ -70,8 +113,54 @@ async function searchPlacesNearby({ lat, lng, radiusMeters = 10000, kinds = 'int
 }
 
 /**
- * Get full details for a single place by xid
- * @param {string} xid - OpenTripMap place ID
+ * Get places for a city by cityId, optionally filtered by category
+ */
+async function getCityPlaces(cityId, category = 'All', limit = 40) {
+  const city = CITY_CENTERS[cityId.toLowerCase()];
+  if (!city) throw new Error(`Unknown city: ${cityId}`);
+
+  const kinds = CATEGORY_KINDS[category] || CATEGORY_KINDS['All'];
+  return searchPlacesNearby({ lat: city.lat, lng: city.lng, radiusMeters: city.radius, kinds, limit });
+}
+
+/**
+ * Search by keyword within Egypt
+ */
+async function searchByKeyword(keyword, limit = 20) {
+  if (!API_KEY) throw new Error('OPENTRIPMAP_API_KEY not configured');
+
+  const cacheKey = `otm_search_${keyword}_${limit}`;
+  const cached = cacheService.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await axios.get(`${BASE_URL}/bbox`, {
+      params: {
+        lon_min: EGYPT_BOUNDS.lonMin, lat_min: EGYPT_BOUNDS.latMin,
+        lon_max: EGYPT_BOUNDS.lonMax, lat_max: EGYPT_BOUNDS.latMax,
+        kinds: CATEGORY_KINDS['All'],
+        name: keyword,
+        limit,
+        format: 'json',
+        apikey: API_KEY
+      },
+      timeout: 12000
+    });
+
+    const places = (response.data || [])
+      .filter(p => p.name && p.name.trim() !== '')
+      .map(p => formatBasicPlace(p));
+
+    cacheService.set(cacheKey, places, 3600);
+    return places;
+  } catch (error) {
+    logger.error('OpenTripMap keyword search failed', { keyword, error: error.message });
+    throw error;
+  }
+}
+
+/**
+ * Get full details for a single place
  */
 async function getPlaceDetails(xid) {
   if (!API_KEY) throw new Error('OPENTRIPMAP_API_KEY not configured');
@@ -87,7 +176,7 @@ async function getPlaceDetails(xid) {
     });
 
     const detail = formatDetailedPlace(response.data);
-    cacheService.set(cacheKey, detail, 7200); // cache 2 hours
+    cacheService.set(cacheKey, detail, 7200);
     return detail;
   } catch (error) {
     logger.error('OpenTripMap place details failed', { xid, error: error.message });
@@ -95,68 +184,17 @@ async function getPlaceDetails(xid) {
   }
 }
 
-/**
- * Search places by name/keyword within Egypt
- * @param {string} keyword - Search term
- * @param {number} limit - Max results
- */
-async function searchByKeyword(keyword, limit = 15) {
-  if (!API_KEY) throw new Error('OPENTRIPMAP_API_KEY not configured');
-
-  const cacheKey = `otm_search_${keyword}_${limit}`;
-  const cached = cacheService.get(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await axios.get(`${BASE_URL}/bbox`, {
-      params: {
-        lon_min: EGYPT_BOUNDS.lonMin,
-        lat_min: EGYPT_BOUNDS.latMin,
-        lon_max: EGYPT_BOUNDS.lonMax,
-        lat_max: EGYPT_BOUNDS.latMax,
-        kinds: 'interesting_places,historic,cultural,natural,beaches',
-        name: keyword,
-        limit,
-        format: 'json',
-        apikey: API_KEY
-      },
-      timeout: 10000
-    });
-
-    const places = response.data
-      .filter(p => p.name && p.name.trim() !== '')
-      .map(formatBasicPlace);
-
-    cacheService.set(cacheKey, places, 3600);
-    return places;
-  } catch (error) {
-    logger.error('OpenTripMap keyword search failed', { keyword, error: error.message });
-    throw error;
-  }
-}
-
-/**
- * Get top attractions for a city (used for homescreen popular places)
- * @param {number} lat - City center latitude
- * @param {number} lng - City center longitude
- * @param {number} limit - Max results
- */
-async function getCityAttractions(lat, lng, limit = 10) {
-  return searchPlacesNearby({
-    lat,
-    lng,
-    radiusMeters: 15000,
-    kinds: 'historic,cultural,archaeology,architecture,natural,museums',
-    limit
-  });
+// Legacy alias
+async function getCityAttractions(lat, lng, limit = 20) {
+  return searchPlacesNearby({ lat, lng, radiusMeters: 15000, kinds: CATEGORY_KINDS['Historical'], limit });
 }
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
-function formatBasicPlace(place) {
+function formatBasicPlace(place, overrideCategory = null) {
   const kinds = place.kinds ? place.kinds.split(',') : [];
   const primaryKind = kinds[0] || 'interesting_places';
-  const category = KIND_TO_CATEGORY[primaryKind] || 'landmark';
+  const category = overrideCategory || KIND_TO_CATEGORY[primaryKind] || 'Landmarks';
 
   return {
     id: place.xid,
@@ -174,7 +212,7 @@ function formatBasicPlace(place) {
 function formatDetailedPlace(place) {
   const kinds = place.kinds ? place.kinds.split(',') : [];
   const primaryKind = kinds[0] || 'interesting_places';
-  const category = KIND_TO_CATEGORY[primaryKind] || 'landmark';
+  const category = KIND_TO_CATEGORY[primaryKind] || 'Landmarks';
 
   return {
     id: place.xid,
@@ -185,12 +223,9 @@ function formatDetailedPlace(place) {
     kinds,
     description: place.wikipedia_extracts?.text || place.info?.descr || '',
     shortDescription: place.wikipedia_extracts?.text
-      ? place.wikipedia_extracts.text.substring(0, 200) + '...'
-      : '',
+      ? place.wikipedia_extracts.text.substring(0, 200) + '...' : '',
     address: place.address
-      ? [place.address.road, place.address.city, place.address.country]
-          .filter(Boolean)
-          .join(', ')
+      ? [place.address.road, place.address.city, place.address.country].filter(Boolean).join(', ')
       : '',
     city: place.address?.city || place.address?.town || '',
     country: place.address?.country || 'Egypt',
@@ -198,14 +233,17 @@ function formatDetailedPlace(place) {
     coverImage: place.preview?.source || null,
     rating: place.rate ? parseFloat(place.rate) : null,
     wikipediaUrl: place.wikipedia || null,
-    osmUrl: place.otm || null,
     source: 'opentripmap'
   };
 }
 
 module.exports = {
+  getPlacesByCategory,
   searchPlacesNearby,
-  getPlaceDetails,
+  getCityPlaces,
   searchByKeyword,
-  getCityAttractions
+  getPlaceDetails,
+  getCityAttractions,
+  CATEGORY_KINDS,
+  CITY_CENTERS
 };
