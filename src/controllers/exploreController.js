@@ -1,9 +1,37 @@
 const { places: staticPlaces, restaurants, curatedHotels, popularFlightRoutes } = require('../data/exploreData');
 const openTripMapService = require('../services/openTripMapService');
+const { getWikipediaSummary } = require('../services/wikipediaService');
 const logger = require('../utils/logger');
 
 // Categories available for filtering
 const CATEGORIES = ['All', 'Historical', 'Religious', 'Nature', 'Sea & Water', 'Culture', 'Entertainment', 'Landmarks'];
+
+/**
+ * Enrich places that have no image with Wikipedia thumbnails
+ * Only fetches for places missing images, batches to avoid rate limits
+ */
+async function enrichWithImages(places) {
+  const needsImage = places.filter(p => !p.coverImage);
+  const hasImage = places.filter(p => p.coverImage);
+
+  // Enrich up to 10 places without images (to stay within API limits)
+  const toEnrich = needsImage.slice(0, 10);
+  const skipped = needsImage.slice(10);
+
+  const enriched = await Promise.all(
+    toEnrich.map(async (place) => {
+      try {
+        const wiki = await getWikipediaSummary(place.name);
+        if (wiki?.thumbnail) {
+          return { ...place, coverImage: wiki.thumbnail };
+        }
+      } catch {}
+      return place;
+    })
+  );
+
+  return [...hasImage, ...enriched, ...skipped];
+}
 
 /**
  * GET /api/explore
@@ -41,14 +69,15 @@ exports.getPlaces = async (req, res) => {
     if (city) {
       try {
         const places = await openTripMapService.getCityPlaces(city.toLowerCase(), category, limitNum);
+        const enriched = await enrichWithImages(places);
         return res.json({
           success: true,
           source: 'opentripmap',
           category,
           city,
-          count: places.length,
+          count: enriched.length,
           categories: CATEGORIES,
-          data: places
+          data: enriched
         });
       } catch (err) {
         logger.warn('OpenTripMap city places failed, falling back to static', { city, err: err.message });
@@ -58,13 +87,14 @@ exports.getPlaces = async (req, res) => {
     // No city — get places across all Egypt by category
     try {
       const places = await openTripMapService.getPlacesByCategory(category, limitNum);
+      const enriched = await enrichWithImages(places);
       return res.json({
         success: true,
         source: 'opentripmap',
         category,
-        count: places.length,
+        count: enriched.length,
         categories: CATEGORIES,
-        data: places
+        data: enriched
       });
     } catch (err) {
       logger.warn('OpenTripMap category search failed, falling back to static', { err: err.message });

@@ -19,7 +19,6 @@ const CATEGORY_KINDS = {
   'Landmarks':         'interesting_places,architecture,monuments',
   'All':               'interesting_places,historic,natural,beaches,religion,museums,cultural'
 };
-
 // Our category label from OTM kinds
 const KIND_TO_CATEGORY = {
   historic: 'Historical', cultural: 'Culture', archaeology: 'Historical',
@@ -52,8 +51,14 @@ const CITY_CENTERS = {
 async function getPlacesByCategory(category = 'All', limit = 50) {
   if (!API_KEY) throw new Error('OPENTRIPMAP_API_KEY not configured');
 
-  const kinds = CATEGORY_KINDS[category] || CATEGORY_KINDS['All'];
-  const cacheKey = `otm_cat_${category}_${limit}`;
+  // Normalize category — handle URL encoding issues like "Sea " instead of "Sea & Water"
+  const normalizedCategory = Object.keys(CATEGORY_KINDS).find(
+    k => k.toLowerCase() === category.toLowerCase() ||
+         k.toLowerCase().replace(/[^a-z]/g, '') === category.toLowerCase().replace(/[^a-z]/g, '')
+  ) || 'All';
+
+  const kinds = CATEGORY_KINDS[normalizedCategory];
+  const cacheKey = `otm_cat_${normalizedCategory}_${limit}`;
   const cached = cacheService.get(cacheKey);
   if (cached) return cached;
 
@@ -74,7 +79,7 @@ async function getPlacesByCategory(category = 'All', limit = 50) {
 
     const places = (response.data || [])
       .filter(p => p.name && p.name.trim() !== '')
-      .map(p => formatBasicPlace(p, category));
+      .map(p => formatBasicPlace(p, normalizedCategory));
 
     cacheService.set(cacheKey, places, 3600);
     return places;
