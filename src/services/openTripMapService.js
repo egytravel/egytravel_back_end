@@ -30,6 +30,34 @@ const KIND_TO_CATEGORY = {
   theatres_and_entertainments: 'Entertainment', art_galleries: 'Culture'
 };
 
+// Fallback images by kind — ensures every place has an image
+const FALLBACK_IMAGES = {
+  egyptian_temples:  'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
+  archaeology:       'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
+  historic:          'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800',
+  burial_places:     'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800',
+  cemeteries:        'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800',
+  architecture:      'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
+  religion:          'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+  mosques:           'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+  churches:          'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+  monasteries:       'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+  natural:           'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+  national_parks:    'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+  beaches:           'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
+  water:             'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
+  museums:           'https://images.unsplash.com/photo-1572252009286-268acec5ca0a?w=800',
+  art_galleries:     'https://images.unsplash.com/photo-1572252009286-268acec5ca0a?w=800',
+  default:           'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800'
+};
+
+function getFallbackImage(kinds) {
+  for (const kind of kinds) {
+    if (FALLBACK_IMAGES[kind]) return FALLBACK_IMAGES[kind];
+  }
+  return FALLBACK_IMAGES.default;
+}
+
 // Egypt city centers
 const CITY_CENTERS = {
   cairo:             { lat: 30.0444, lng: 31.2357, radius: 20000 },
@@ -200,6 +228,7 @@ function formatBasicPlace(place, overrideCategory = null) {
   const kinds = place.kinds ? place.kinds.split(',') : [];
   const primaryKind = kinds[0] || 'interesting_places';
   const category = overrideCategory || KIND_TO_CATEGORY[primaryKind] || 'Landmarks';
+  const coverImage = place.preview?.source || getFallbackImage(kinds);
 
   return {
     id: place.xid,
@@ -209,7 +238,7 @@ function formatBasicPlace(place, overrideCategory = null) {
     category,
     kinds: kinds.slice(0, 3),
     rating: place.rate ? parseFloat(place.rate) : null,
-    coverImage: place.preview?.source || null,
+    coverImage,
     source: 'opentripmap'
   };
 }
