@@ -36,7 +36,7 @@ const Booking = sequelize.define('Booking', {
   provider: {
     type: DataTypes.STRING(100),
     allowNull: true,
-    defaultValue: 'Booking.com'
+    defaultValue: 'Amadeus'
   },
   booking_url: {
     type: DataTypes.TEXT,

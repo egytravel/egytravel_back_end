@@ -44,6 +44,20 @@ const Trip = sequelize.define('Trip', {
     type: DataTypes.ENUM('planning', 'confirmed', 'completed', 'cancelled'),
     allowNull: false,
     defaultValue: 'planning'
+  },
+  cover_image: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  interests: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Array of interest tags e.g. ["Historical", "Beaches"]'
+  },
+  source: {
+    type: DataTypes.ENUM('manual', 'ai'),
+    allowNull: false,
+    defaultValue: 'manual'
   }
 }, {
   tableName: 'trips',

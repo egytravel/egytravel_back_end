@@ -49,7 +49,7 @@ const User = sequelize.define('User', {
   tableName: 'users',
   timestamps: true,
   createdAt: 'created_at',
-  updatedAt: false, // No updated_at column in existing table
+  updatedAt: 'updated_at',
   hooks: {
     beforeCreate: async (user) => {
       if (user.password_hash) {
