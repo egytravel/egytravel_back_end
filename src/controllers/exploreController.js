@@ -7,33 +7,6 @@ const logger = require('../utils/logger');
 const CATEGORIES = ['All', 'Historical', 'Religious', 'Nature', 'Sea & Water', 'Culture', 'Entertainment', 'Landmarks'];
 
 /**
- * Enrich places that have no image with Wikipedia thumbnails
- * Only fetches for places missing images, batches to avoid rate limits
- */
-async function enrichWithImages(places) {
-  const needsImage = places.filter(p => !p.coverImage);
-  const hasImage = places.filter(p => p.coverImage);
-
-  // Enrich up to 10 places without images (to stay within API limits)
-  const toEnrich = needsImage.slice(0, 10);
-  const skipped = needsImage.slice(10);
-
-  const enriched = await Promise.all(
-    toEnrich.map(async (place) => {
-      try {
-        const wiki = await getWikipediaSummary(place.name);
-        if (wiki?.thumbnail) {
-          return { ...place, coverImage: wiki.thumbnail };
-        }
-      } catch {}
-      return place;
-    })
-  );
-
-  return [...hasImage, ...enriched, ...skipped];
-}
-
-/**
  * GET /api/explore
  * Full explore screen — static popular places + live data sections
  */
@@ -56,48 +29,55 @@ exports.getExploreData = async (req, res) => {
 };
 
 /**
- * GET /api/explore/places?category=Historical&city=cairo&limit=40
- * Live places from OpenTripMap, filtered by category
- * Falls back to static data if OpenTripMap is unavailable
+ * GET /api/explore/places?category=Historical&page=1&pageSize=20&city=cairo
+ * Live places from OpenTripMap with real images, paginated
  */
 exports.getPlaces = async (req, res) => {
   try {
-    const { category = 'All', city, limit = 40 } = req.query;
-    const limitNum = Math.min(parseInt(limit) || 40, 100);
+    const { category = 'All', city, page = 1, pageSize = 20 } = req.query;
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const pageSizeNum = Math.min(parseInt(pageSize) || 20, 40);
 
-    // If city specified, get places near that city
+    // City-specific request
     if (city) {
       try {
-        const places = await openTripMapService.getCityPlaces(city.toLowerCase(), category, limitNum);
-        const enriched = await enrichWithImages(places);
+        const places = await openTripMapService.getCityPlaces(city.toLowerCase(), category, 100);
+        const offset = (pageNum - 1) * pageSizeNum;
+        const pagePlaces = places.slice(offset, offset + pageSizeNum);
+
         return res.json({
           success: true,
           source: 'opentripmap',
           category,
           city,
-          count: enriched.length,
+          page: pageNum,
+          pageSize: pageSizeNum,
+          hasMore: offset + pageSizeNum < places.length,
+          total: places.length,
           categories: CATEGORIES,
-          data: enriched
+          data: pagePlaces
         });
       } catch (err) {
         logger.warn('OpenTripMap city places failed, falling back to static', { city, err: err.message });
       }
     }
 
-    // No city — get places across all Egypt by category
+    // Category request with real images via detail API
     try {
-      const places = await openTripMapService.getPlacesByCategory(category, limitNum);
-      const enriched = await enrichWithImages(places);
+      const result = await openTripMapService.getPlacesWithImages(category, pageNum, pageSizeNum);
       return res.json({
         success: true,
         source: 'opentripmap',
         category,
-        count: enriched.length,
+        page: result.page,
+        pageSize: result.pageSize,
+        hasMore: result.hasMore,
+        total: result.total,
         categories: CATEGORIES,
-        data: enriched
+        data: result.data
       });
     } catch (err) {
-      logger.warn('OpenTripMap category search failed, falling back to static', { err: err.message });
+      logger.warn('OpenTripMap places with images failed, falling back to static', { err: err.message });
     }
 
     // Fallback to static data
@@ -109,9 +89,12 @@ exports.getPlaces = async (req, res) => {
       success: true,
       source: 'static',
       category,
-      count: results.length,
+      page: pageNum,
+      pageSize: pageSizeNum,
+      hasMore: false,
+      total: results.length,
       categories: CATEGORIES,
-      data: results.slice(0, limitNum)
+      data: results.slice((pageNum - 1) * pageSizeNum, pageNum * pageSizeNum)
     });
   } catch (error) {
     logger.error('Get places error', { error: error.message });

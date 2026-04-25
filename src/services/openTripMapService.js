@@ -73,6 +73,63 @@ const CITY_CENTERS = {
 };
 
 /**
+ * Get places by category with real images via detail API
+ * Fetches a page of 20 places and enriches each with a real photo
+ * @param {string} category
+ * @param {number} page - Page number (1-based)
+ * @param {number} pageSize - Items per page (default 20)
+ */
+async function getPlacesWithImages(category = 'All', page = 1, pageSize = 20) {
+  if (!API_KEY) throw new Error('OPENTRIPMAP_API_KEY not configured');
+
+  // Normalize category
+  const normalizedCategory = Object.keys(CATEGORY_KINDS).find(
+    k => k.toLowerCase() === category.toLowerCase() ||
+         k.toLowerCase().replace(/[^a-z]/g, '') === category.toLowerCase().replace(/[^a-z]/g, '')
+  ) || 'All';
+
+  // Fetch a larger pool to paginate from (cached)
+  const allPlaces = await getPlacesByCategory(normalizedCategory, 200);
+
+  // Paginate
+  const offset = (page - 1) * pageSize;
+  const pagePlaces = allPlaces.slice(offset, offset + pageSize);
+  const hasMore = offset + pageSize < allPlaces.length;
+
+  // Enrich each place with real image from detail API
+  const enriched = await Promise.all(
+    pagePlaces.map(async (place) => {
+      // Already has a real image (not a fallback) — skip detail call
+      if (place.coverImage && !place.coverImage.includes('unsplash.com')) {
+        return place;
+      }
+
+      const cacheKey = `otm_img_${place.id}`;
+      const cached = cacheService.get(cacheKey);
+      if (cached) return { ...place, coverImage: cached };
+
+      try {
+        const detail = await getPlaceDetails(place.id);
+        if (detail.coverImage && !detail.coverImage.includes('unsplash.com')) {
+          cacheService.set(cacheKey, detail.coverImage, 86400); // cache 24h
+          return { ...place, coverImage: detail.coverImage };
+        }
+      } catch {}
+
+      return place; // keep fallback if detail fails
+    })
+  );
+
+  return {
+    data: enriched,
+    page,
+    pageSize,
+    hasMore,
+    total: allPlaces.length
+  };
+}
+
+/**
  * Get places by category across all of Egypt (bbox search)
  * Returns up to `limit` places for a given category
  */
@@ -272,6 +329,7 @@ function formatDetailedPlace(place) {
 }
 
 module.exports = {
+  getPlacesWithImages,
   getPlacesByCategory,
   searchPlacesNearby,
   getCityPlaces,
