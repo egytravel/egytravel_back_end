@@ -73,12 +73,22 @@ async function enrichWithWikipedia(destination) {
 
     if (!wiki) return destination;
 
+    // Use Wikipedia thumbnail as coverImage if the destination has none or uses a fallback
+    const needsImage = !destination.coverImage ||
+      destination.coverImage.includes('unsplash.com') ||
+      destination.coverImage === null;
+
+    const wikiImage = wiki.thumbnail || wiki.originalImage;
+
     return {
       ...destination,
-      // Override description only if Wikipedia has a better one
       description: wiki.extract || destination.description,
       shortDescription: wiki.extractShort || destination.shortDescription,
-      // Add Wikipedia extras
+      // Inject Wikipedia image if destination has no real image
+      coverImage: (needsImage && wikiImage) ? wikiImage : destination.coverImage,
+      images: (needsImage && wikiImage && (!destination.images || destination.images.length === 0))
+        ? [wikiImage]
+        : destination.images,
       wikipedia: {
         title: wiki.title,
         url: wiki.wikipediaUrl,

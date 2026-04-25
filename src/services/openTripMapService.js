@@ -305,6 +305,9 @@ function formatDetailedPlace(place) {
   const primaryKind = kinds[0] || 'interesting_places';
   const category = KIND_TO_CATEGORY[primaryKind] || 'Landmarks';
 
+  // Priority: OTM preview → Wikipedia thumbnail → fallback by kind
+  const coverImage = place.preview?.source || getFallbackImage(kinds);
+
   return {
     id: place.xid,
     name: place.name,
@@ -320,8 +323,8 @@ function formatDetailedPlace(place) {
       : '',
     city: place.address?.city || place.address?.town || '',
     country: place.address?.country || 'Egypt',
-    images: place.preview?.source ? [place.preview.source] : [],
-    coverImage: place.preview?.source || null,
+    images: coverImage ? [coverImage] : [],
+    coverImage,
     rating: place.rate ? parseFloat(place.rate) : null,
     wikipediaUrl: place.wikipedia || null,
     source: 'opentripmap'
