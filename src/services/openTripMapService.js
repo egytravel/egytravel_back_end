@@ -285,7 +285,8 @@ function formatBasicPlace(place, overrideCategory = null) {
   const kinds = place.kinds ? place.kinds.split(',') : [];
   const primaryKind = kinds[0] || 'interesting_places';
   const category = overrideCategory || KIND_TO_CATEGORY[primaryKind] || 'Landmarks';
-  const coverImage = place.preview?.source || getFallbackImage(kinds);
+  // Only use real OTM image — no fake fallbacks
+  const coverImage = place.preview?.source || null;
 
   return {
     id: place.xid,

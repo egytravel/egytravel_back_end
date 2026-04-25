@@ -304,17 +304,23 @@ exports.searchRealPlaces = async (req, res) => {
 
     const results = await openTripMapService.searchByKeyword(q.trim(), 20);
 
+    // Enrich top results with Wikipedia for real specific images
+    const enriched = await Promise.all(
+      results.slice(0, 10).map(place => enrichPlace(place))
+    );
+    const allResults = [...enriched, ...results.slice(10)];
+
     // Compute map view
     let mapView = null;
-    if (results.length === 1) {
-      mapView = { lat: results[0].lat, lng: results[0].lng, zoom: 14 };
-    } else if (results.length > 1) {
-      const avgLat = results.reduce((s, d) => s + d.lat, 0) / results.length;
-      const avgLng = results.reduce((s, d) => s + d.lng, 0) / results.length;
+    if (allResults.length === 1) {
+      mapView = { lat: allResults[0].lat, lng: allResults[0].lng, zoom: 14 };
+    } else if (allResults.length > 1) {
+      const avgLat = allResults.reduce((s, d) => s + d.lat, 0) / allResults.length;
+      const avgLng = allResults.reduce((s, d) => s + d.lng, 0) / allResults.length;
       mapView = { lat: avgLat, lng: avgLng, zoom: 7 };
     }
 
-    res.json({ success: true, count: results.length, mapView, data: results });
+    res.json({ success: true, count: allResults.length, mapView, data: allResults });
   } catch (error) {
     logger.error('Real place search error', { error: error.message });
     res.status(500).json({
@@ -326,8 +332,7 @@ exports.searchRealPlaces = async (req, res) => {
 
 /**
  * GET /api/home/places/city/:cityId
- * Get real attractions for a specific city
- * cityId: cairo | luxor | aswan | sharm-el-sheikh | hurghada | alexandria | dahab | siwa
+ * Get real attractions for a specific city with Wikipedia images
  */
 exports.getCityPlaces = async (req, res) => {
   try {
@@ -351,12 +356,22 @@ exports.getCityPlaces = async (req, res) => {
     const limit = parseInt(req.query.limit) || 15;
     const results = await openTripMapService.getCityAttractions(center.lat, center.lng, limit);
 
+    // Enrich top 10 with Wikipedia to get real specific images
+    // (limit to 10 to avoid too many Wikipedia calls)
+    const enriched = await Promise.all(
+      results.slice(0, 10).map(place => enrichPlace(place))
+    );
+
+    // Append remaining places without enrichment
+    const remaining = results.slice(10);
+    const allPlaces = [...enriched, ...remaining];
+
     res.json({
       success: true,
       city: cityId,
       center,
-      count: results.length,
-      data: results
+      count: allPlaces.length,
+      data: allPlaces
     });
   } catch (error) {
     logger.error('Get city places error', { error: error.message });
