@@ -268,6 +268,22 @@ exports.mapSearch = async (req, res) => {
 const openTripMapService = require('../services/openTripMapService');
 const { enrichWithWikipedia: enrichPlace } = require('../services/wikipediaService');
 
+// Enrich a place with Wikipedia, then fall back to OTM detail image if still null
+async function enrichPlaceWithImage(place) {
+  const enriched = await enrichPlace(place);
+  // If still no image, try fetching OTM detail for its preview.source
+  if (!enriched.coverImage && place.id) {
+    try {
+      const detail = await openTripMapService.getPlaceDetails(place.id);
+      if (detail.coverImage) {
+        enriched.coverImage = detail.coverImage;
+        enriched.images = [detail.coverImage];
+      }
+    } catch {}
+  }
+  return enriched;
+}
+
 // City centers for Egypt's main cities
 const CITY_CENTERS = {
   cairo:         { lat: 30.0444, lng: 31.2357 },
@@ -304,11 +320,10 @@ exports.searchRealPlaces = async (req, res) => {
 
     const results = await openTripMapService.searchByKeyword(q.trim(), 20);
 
-    // Enrich top results with Wikipedia for real specific images
-    const enriched = await Promise.all(
-      results.slice(0, 10).map(place => enrichPlace(place))
+    // Enrich ALL results with Wikipedia + OTM detail for real specific images
+    const allResults = await Promise.all(
+      results.map(place => enrichPlaceWithImage(place))
     );
-    const allResults = [...enriched, ...results.slice(10)];
 
     // Compute map view
     let mapView = null;
@@ -356,22 +371,17 @@ exports.getCityPlaces = async (req, res) => {
     const limit = parseInt(req.query.limit) || 15;
     const results = await openTripMapService.getCityAttractions(center.lat, center.lng, limit);
 
-    // Enrich top 10 with Wikipedia to get real specific images
-    // (limit to 10 to avoid too many Wikipedia calls)
+    // Enrich ALL places with Wikipedia + OTM detail for real specific images
     const enriched = await Promise.all(
-      results.slice(0, 10).map(place => enrichPlace(place))
+      results.map(place => enrichPlaceWithImage(place))
     );
-
-    // Append remaining places without enrichment
-    const remaining = results.slice(10);
-    const allPlaces = [...enriched, ...remaining];
 
     res.json({
       success: true,
       city: cityId,
       center,
-      count: allPlaces.length,
-      data: allPlaces
+      count: enriched.length,
+      data: enriched
     });
   } catch (error) {
     logger.error('Get city places error', { error: error.message });
@@ -400,7 +410,7 @@ exports.getRealPlaceDetails = async (req, res) => {
     const place = await openTripMapService.getPlaceDetails(xid);
 
     // Enrich with Wikipedia if the place has a name
-    const enriched = place.name ? await enrichPlace(place) : place;
+    const enriched = place.name ? await enrichPlaceWithImage(place) : place;
 
     res.json({ success: true, data: enriched });
   } catch (error) {
