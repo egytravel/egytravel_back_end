@@ -1,25 +1,57 @@
 const { places: staticPlaces, restaurants, curatedHotels, popularFlightRoutes } = require('../data/exploreData');
 const openTripMapService = require('../services/openTripMapService');
+const bookingHotelService = require('../services/bookingComRapidService');
+const bookingFlightService = require('../services/bookingComFlightService');
 const { getWikipediaSummary } = require('../services/wikipediaService');
 const logger = require('../utils/logger');
+
+// Default search params for explore screen (today + 2 days)
+function getDefaultDates() {
+  const checkin = new Date();
+  checkin.setDate(checkin.getDate() + 7); // 1 week from now
+  const checkout = new Date(checkin);
+  checkout.setDate(checkout.getDate() + 2);
+  return {
+    checkin: checkin.toISOString().split('T')[0],
+    checkout: checkout.toISOString().split('T')[0]
+  };
+}
 
 // Categories available for filtering
 const CATEGORIES = ['All', 'Historical', 'Religious', 'Nature', 'Sea & Water', 'Culture', 'Entertainment', 'Landmarks'];
 
 /**
  * GET /api/explore
- * Full explore screen — static popular places + live data sections
+ * Full explore screen — static popular places + live hotels + live flights
  */
 exports.getExploreData = async (req, res) => {
   try {
+    const { checkin, checkout } = getDefaultDates();
+
+    // Fetch real hotels for Cairo (most popular city) in parallel with flights
+    let hotels = curatedHotels.slice(0, 4); // fallback
+    let flights = popularFlightRoutes;       // fallback
+
+    const [hotelsResult, flightsResult] = await Promise.allSettled([
+      bookingHotelService.searchHotels({ cityCode: 'CAI', checkin, checkout, adults: 2, rooms: 1 }),
+      bookingFlightService.searchFlights({ origin: 'CAI', destination: 'LXR', departureDate: checkin, adults: 1 })
+    ]);
+
+    if (hotelsResult.status === 'fulfilled' && hotelsResult.value.length > 0) {
+      hotels = hotelsResult.value.slice(0, 4);
+    }
+    if (flightsResult.status === 'fulfilled' && flightsResult.value.length > 0) {
+      flights = flightsResult.value.slice(0, 4);
+    }
+
     res.json({
       success: true,
       data: {
         categories: CATEGORIES,
-        popularPlaces: staticPlaces,           // Static curated top places
+        popularPlaces: staticPlaces,
         restaurants: restaurants.slice(0, 4),
-        hotels: curatedHotels.slice(0, 4),
-        flights: popularFlightRoutes
+        hotels,
+        flights
       }
     });
   } catch (error) {
@@ -164,29 +196,82 @@ exports.getRestaurantById = async (req, res) => {
 };
 
 /**
- * GET /api/explore/hotels?city=Aswan&category=Luxury
+ * GET /api/explore/hotels?city=cairo&checkin=2026-06-01&checkout=2026-06-03&guests=2
+ * Real hotels from Booking.com, falls back to curated static data
  */
 exports.getCuratedHotels = async (req, res) => {
   try {
-    const { city, category, limit } = req.query;
-    const limitNum = parseInt(limit) || 20;
+    const { city, checkin, checkout, guests, rooms, page } = req.query;
+    const { checkin: defaultCheckin, checkout: defaultCheckout } = getDefaultDates();
 
-    let results = [...curatedHotels];
-    if (city) results = results.filter(h => h.city.toLowerCase() === city.toLowerCase());
-    if (category) results = results.filter(h => h.category === category);
+    // Map city name to IATA code
+    const cityCodeMap = {
+      cairo: 'CAI', luxor: 'LXR', aswan: 'ASW',
+      'sharm-el-sheikh': 'SSH', hurghada: 'HRG', alexandria: 'ALY',
+      sharm: 'SSH'
+    };
 
-    res.json({ success: true, count: results.slice(0, limitNum).length, data: results.slice(0, limitNum) });
+    const cityCode = city
+      ? (cityCodeMap[city.toLowerCase()] || city.toUpperCase())
+      : 'CAI';
+
+    try {
+      const results = await bookingHotelService.searchHotels({
+        cityCode,
+        checkin: checkin || defaultCheckin,
+        checkout: checkout || defaultCheckout,
+        adults: guests ? parseInt(guests) : 2,
+        rooms: rooms ? parseInt(rooms) : 1,
+        page: page ? parseInt(page) : 0
+      });
+
+      return res.json({
+        success: true,
+        source: 'booking.com',
+        city: cityCode,
+        count: results.length,
+        data: results
+      });
+    } catch (err) {
+      logger.warn('Booking.com hotels failed, falling back to static', { err: err.message });
+      // Fallback to static curated data
+      let fallback = [...curatedHotels];
+      if (city) fallback = fallback.filter(h => h.city.toLowerCase() === city.toLowerCase());
+      return res.json({ success: true, source: 'static', count: fallback.length, data: fallback });
+    }
   } catch (error) {
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load hotels' } });
   }
 };
 
 /**
- * GET /api/explore/flights
+ * GET /api/explore/flights?origin=CAI&destination=LXR&date=2026-06-01
+ * Real flights from Booking.com, falls back to static popular routes
  */
 exports.getPopularFlights = async (req, res) => {
   try {
-    res.json({ success: true, count: popularFlightRoutes.length, data: popularFlightRoutes });
+    const { origin = 'CAI', destination = 'LXR', date, adults = '1', travelClass = 'ECONOMY' } = req.query;
+    const { checkin: defaultDate } = getDefaultDates();
+
+    try {
+      const results = await bookingFlightService.searchFlights({
+        origin: origin.toUpperCase(),
+        destination: destination.toUpperCase(),
+        departureDate: date || defaultDate,
+        adults: parseInt(adults),
+        cabinClass: travelClass.toUpperCase()
+      });
+
+      return res.json({
+        success: true,
+        source: 'booking.com',
+        count: results.length,
+        data: results
+      });
+    } catch (err) {
+      logger.warn('Booking.com flights failed, falling back to static', { err: err.message });
+      return res.json({ success: true, source: 'static', count: popularFlightRoutes.length, data: popularFlightRoutes });
+    }
   } catch (error) {
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load flights' } });
   }
