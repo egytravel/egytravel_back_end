@@ -191,3 +191,96 @@ exports.removeFavorite = async (req, res) => {
     });
   }
 };
+
+/**
+ * POST /api/favorites
+ * Generic add to favorites — works for any item type
+ * Body: { itemId, itemType, itemName, itemLocation, imageUrl, itemData, notes, tags }
+ */
+exports.addToFavorites = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { itemId, itemType, itemName, itemLocation, imageUrl, itemData, description, notes, tags } = req.body;
+
+    if (!itemId || !itemType || !itemName) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_REQUIRED_PARAMS', message: 'itemId, itemType, and itemName are required' }
+      });
+    }
+
+    const validTypes = ['hotel', 'place', 'itinerary', 'activity', 'restaurant', 'attraction', 'trip', 'destination'];
+    if (!validTypes.includes(itemType)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: `Invalid itemType. Must be one of: ${validTypes.join(', ')}` }
+      });
+    }
+
+    // Check if already favorited
+    const existing = await Favorite.findOne({
+      where: { user_id: userId, item_type: itemType, item_id: String(itemId) }
+    });
+
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        error: { code: 'FAVORITE_ALREADY_EXISTS', message: 'Already in favorites' }
+      });
+    }
+
+    const favorite = await Favorite.create({
+      user_id: userId,
+      item_type: itemType,
+      item_id: String(itemId),
+      item_name: itemName,
+      item_description: description || null,
+      item_image_url: imageUrl || null,
+      item_location: itemLocation || null,
+      item_data: itemData || null,
+      notes: notes || null,
+      tags: tags || null
+    });
+
+    logger.info('Added to favorites', { favoriteId: favorite.favorite_id, userId, itemType, itemId });
+
+    res.status(201).json({ success: true, data: favorite.toJSON() });
+  } catch (error) {
+    logger.error('Add to favorites error', { error: error.message });
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(409).json({ success: false, error: { code: 'FAVORITE_ALREADY_EXISTS', message: 'Already in favorites' } });
+    }
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to add to favorites' } });
+  }
+};
+
+/**
+ * GET /api/favorites/check?itemId=123&itemType=hotel
+ * Check if a specific item is in the user's favorites
+ */
+exports.checkFavorite = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { itemId, itemType } = req.query;
+
+    if (!itemId || !itemType) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_REQUIRED_PARAMS', message: 'itemId and itemType are required' }
+      });
+    }
+
+    const favorite = await Favorite.findOne({
+      where: { user_id: userId, item_type: itemType, item_id: String(itemId) }
+    });
+
+    res.json({
+      success: true,
+      isFavorited: !!favorite,
+      favoriteId: favorite?.favorite_id || null
+    });
+  } catch (error) {
+    logger.error('Check favorite error', { error: error.message });
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to check favorite' } });
+  }
+};

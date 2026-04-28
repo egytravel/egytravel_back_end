@@ -3,31 +3,21 @@ const router = express.Router();
 const favoriteController = require('../controllers/favoriteController');
 const { authenticateToken } = require('../middleware/auth');
 
-// All favorite routes require authentication
 router.use(authenticateToken);
 
-/**
- * @route   POST /api/favorites/hotel
- * @desc    Add hotel to favorites
- * @access  Private (authenticated users)
- * @body    hotelId, hotelName, location, imageUrl, priceData, description, notes, tags
- */
-router.post('/hotel', favoriteController.addHotelToFavorites);
-
-/**
- * @route   GET /api/favorites
- * @desc    Get user's favorites
- * @access  Private (authenticated users)
- * @query   type
- */
+// GET /api/favorites — get all favorites (filter by ?type=hotel|place|restaurant|etc)
 router.get('/', favoriteController.getFavorites);
 
-/**
- * @route   DELETE /api/favorites/:favoriteId
- * @desc    Remove from favorites
- * @access  Private (authenticated users)
- * @params  favoriteId
- */
+// GET /api/favorites/check?itemId=123&itemType=hotel — check if item is favorited
+router.get('/check', favoriteController.checkFavorite);
+
+// POST /api/favorites — generic add any item type to favorites
+router.post('/', favoriteController.addToFavorites);
+
+// POST /api/favorites/hotel — legacy hotel-specific endpoint (kept for compatibility)
+router.post('/hotel', favoriteController.addHotelToFavorites);
+
+// DELETE /api/favorites/:favoriteId — remove from favorites
 router.delete('/:favoriteId', favoriteController.removeFavorite);
 
 module.exports = router;
