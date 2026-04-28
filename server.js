@@ -22,6 +22,7 @@ const favoriteRoutes = require('./src/routes/favorites');
 const reviewRoutes = require('./src/routes/reviews');
 const communityRoutes = require('./src/routes/community');
 const tripRoutes = require('./src/routes/trips');
+const eventRoutes = require('./src/routes/events');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -110,6 +111,7 @@ app.use('/api/favorites', limiter, favoriteRoutes);
 app.use('/api/trips', limiter, tripRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/community', communityRoutes);
+app.use('/api/events', eventRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -9,6 +9,7 @@ const Review = require('./Review');
 const Post = require('./Post');
 const PostLike = require('./PostLike');
 const PostComment = require('./PostComment');
+const Event = require('./Event');
 const Place = require('./Place');
 const Notification = require('./Notification');
 
@@ -95,6 +96,10 @@ Post.hasMany(PostComment, { foreignKey: 'post_id', as: 'comments', onDelete: 'CA
 PostComment.belongsTo(Post, { foreignKey: 'post_id', as: 'post' });
 PostComment.belongsTo(User, { foreignKey: 'user_id', as: 'author', onDelete: 'CASCADE' });
 
+// Event associations
+Event.belongsTo(User, { foreignKey: 'created_by', as: 'creator', onDelete: 'CASCADE' });
+User.hasMany(Event, { foreignKey: 'created_by', as: 'events', onDelete: 'CASCADE' });
+
 // Notification associations
 Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user', onDelete: 'CASCADE' });
 User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications', onDelete: 'CASCADE' });
@@ -118,5 +123,5 @@ const syncDatabase = async (force = false) => {
 module.exports = {
   sequelize, User, PasswordResetToken, Trip, Booking,
   Favorite, Review, Post, PostLike, PostComment,
-  Place, Notification, syncDatabase
+  Event, Place, Notification, syncDatabase
 };
