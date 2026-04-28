@@ -66,7 +66,7 @@ function isValidBookingStatus(status) {
  * @returns {boolean} Is valid
  */
 function isValidItemType(type) {
-  const validTypes = ['hotel', 'place', 'itinerary', 'activity', 'restaurant', 'attraction', 'trip'];
+  const validTypes = ['hotel', 'place', 'destination', 'itinerary', 'activity', 'restaurant', 'attraction', 'trip'];
   return validTypes.includes(type);
 }
 

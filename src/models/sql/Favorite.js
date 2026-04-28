@@ -17,7 +17,7 @@ const Favorite = sequelize.define('Favorite', {
     }
   },
   item_type: {
-    type: DataTypes.ENUM('hotel', 'place', 'itinerary', 'activity', 'restaurant', 'attraction', 'trip'),
+    type: DataTypes.ENUM('hotel', 'place', 'destination', 'itinerary', 'activity', 'restaurant', 'attraction', 'trip'),
     allowNull: false,
     comment: 'Type of item being favorited'
   },
