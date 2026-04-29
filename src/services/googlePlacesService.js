@@ -5,21 +5,6 @@ const logger = require('../utils/logger');
 const BASE_URL = 'https://maps.googleapis.com/maps/api/place';
 const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
-// Mapping our destination IDs to Google Place IDs
-// These need to be looked up once and hardcoded for efficiency
-const PLACE_ID_MAP = {
-  'pyramids-of-giza':    'ChIJp3ot-OdigCcRRMBGMbCMCRY',
-  'valley-of-the-kings': 'ChIJN1t_tDeuEmsRUsoyG83frY4',
-  'karnak-temple':       'ChIJi4uu-OdigCcRRMBGMbCMCRY',
-  'abu-simbel':          'ChIJrTLr-GyuEmsRBfy61i59si0',
-  'naama-bay':           'ChIJdd4hrwug2EcRmSrV3Vo6llI',
-  'white-desert-explore':'ChIJN1t_tDeuEmsRUsoyG83frY4',
-  'saint-catherine':     'ChIJN1t_tDeuEmsRUsoyG83frY4',
-  'hurghada-beach':      'ChIJdd4hrwug2EcRmSrV3Vo6llI',
-  'sharm-el-sheikh':     'ChIJdd4hrwug2EcRmSrV3Vo6llI',
-  'alexandria':          'ChIJdd4hrwug2EcRmSrV3Vo6llI'
-};
-
 /**
  * Search for a place by name and location to get its Google Place ID
  * @param {string} name - Place name
@@ -114,20 +99,17 @@ async function getPlaceDetails(placeId) {
 
 /**
  * Get Google reviews for a destination by our internal ID
- * Falls back to text search if no Place ID mapping exists
+ * Always uses text search to find the correct Place ID dynamically
  */
 async function getReviewsForDestination(destinationId, destinationName, lat, lng) {
   if (!API_KEY) return null;
 
-  // Try hardcoded mapping first
-  let placeId = PLACE_ID_MAP[destinationId];
-
-  // If not in map, search by name + coordinates
-  if (!placeId) {
-    placeId = await findPlaceId(destinationName, lat, lng);
-  }
-
+  // Always search dynamically — more reliable than hardcoded IDs
+  const placeId = await findPlaceId(destinationName + ' Egypt', lat, lng);
   if (!placeId) return null;
+
+  // Cache the place ID mapping for future calls
+  cacheService.set(`google_placeid_${destinationId}`, placeId, 86400 * 7); // cache 7 days
 
   return await getPlaceDetails(placeId);
 }
