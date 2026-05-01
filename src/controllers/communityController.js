@@ -1,63 +1,27 @@
-const { Post, PostLike, PostComment, User } = require('../models/sql');
-const { Op } = require('sequelize');
+const Post = require('../models/nosql/Post');
 const logger = require('../utils/logger');
-
-const POST_INCLUDE = [
-  { model: User, as: 'author', attributes: ['user_id', 'name'] },
-  { model: PostComment, as: 'comments',
-    limit: 3, order: [['created_at', 'DESC']],
-    include: [{ model: User, as: 'author', attributes: ['user_id', 'name'] }]
-  }
-];
-
-function formatPost(post, currentUserId = null) {
-  const p = post.toJSON ? post.toJSON() : post;
-  return {
-    postId: p.post_id,
-    author: { id: p.author?.user_id, name: p.author?.name },
-    caption: p.caption,
-    images: p.images || [],
-    place: p.place_id ? { id: p.place_id, name: p.place_name, type: p.place_type } : null,
-    rating: p.rating ? parseFloat(p.rating) : null,
-    visitDate: p.visit_date,
-    likesCount: p.likes_count,
-    commentsCount: p.comments_count,
-    recentComments: (p.comments || []).map(c => ({
-      commentId: c.comment_id,
-      author: { id: c.author?.user_id, name: c.author?.name },
-      comment: c.comment,
-      createdAt: c.created_at
-    })),
-    createdAt: p.created_at
-  };
-}
 
 /**
  * GET /api/community/feed
- * Get community feed (all posts, newest first)
  */
 exports.getFeed = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     const { placeId } = req.query;
 
-    const where = placeId ? { place_id: placeId } : {};
+    const filter = placeId ? { placeId } : {};
 
-    const { count, rows } = await Post.findAndCountAll({
-      where,
-      include: POST_INCLUDE,
-      order: [['created_at', 'DESC']],
-      limit,
-      offset,
-      distinct: true
-    });
+    const [posts, total] = await Promise.all([
+      Post.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Post.countDocuments(filter)
+    ]);
 
     res.json({
       success: true,
-      data: rows.map(p => formatPost(p)),
-      pagination: { page, limit, total: count, pages: Math.ceil(count / limit) }
+      data: posts.map(formatPost),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
     logger.error('Get feed error', { error: error.message });
@@ -67,35 +31,29 @@ exports.getFeed = async (req, res) => {
 
 /**
  * POST /api/community/posts
- * Create a new post
  */
 exports.createPost = async (req, res) => {
   try {
-    const userId = req.user.user_id;
     const { caption, images, placeId, placeName, placeType, rating, visitDate } = req.body;
 
-    if (!caption || caption.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_REQUIRED_PARAMS', message: 'Caption is required' }
-      });
+    if (!caption?.trim()) {
+      return res.status(400).json({ success: false, error: { code: 'MISSING_REQUIRED_PARAMS', message: 'Caption is required' } });
     }
 
     const post = await Post.create({
-      user_id: userId,
+      userId: req.user.user_id,
+      authorName: req.user.name,
       caption: caption.trim(),
       images: images || [],
-      place_id: placeId || null,
-      place_name: placeName || null,
-      place_type: placeType || null,
+      placeId: placeId || null,
+      placeName: placeName || null,
+      placeType: placeType || null,
       rating: rating ? parseFloat(rating) : null,
-      visit_date: visitDate || null
+      visitDate: visitDate || null
     });
 
-    const fullPost = await Post.findByPk(post.post_id, { include: POST_INCLUDE });
-
-    logger.info('Post created', { postId: post.post_id, userId });
-    res.status(201).json({ success: true, data: formatPost(fullPost) });
+    logger.info('Post created', { postId: post._id, userId: req.user.user_id });
+    res.status(201).json({ success: true, data: formatPost(post.toObject()) });
   } catch (error) {
     logger.error('Create post error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create post' } });
@@ -104,27 +62,13 @@ exports.createPost = async (req, res) => {
 
 /**
  * GET /api/community/posts/:postId
- * Get single post with all comments
  */
 exports.getPost = async (req, res) => {
   try {
-    const { postId } = req.params;
-
-    const post = await Post.findByPk(postId, {
-      include: [
-        { model: User, as: 'author', attributes: ['user_id', 'name'] },
-        {
-          model: PostComment, as: 'comments',
-          order: [['created_at', 'ASC']],
-          include: [{ model: User, as: 'author', attributes: ['user_id', 'name'] }]
-        }
-      ]
-    });
-
+    const post = await Post.findById(req.params.postId).lean();
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
     }
-
     res.json({ success: true, data: formatPost(post) });
   } catch (error) {
     logger.error('Get post error', { error: error.message });
@@ -134,19 +78,14 @@ exports.getPost = async (req, res) => {
 
 /**
  * DELETE /api/community/posts/:postId
- * Delete own post
  */
 exports.deletePost = async (req, res) => {
   try {
-    const userId = req.user.user_id;
-    const { postId } = req.params;
-
-    const post = await Post.findOne({ where: { post_id: postId, user_id: userId } });
+    const post = await Post.findOne({ _id: req.params.postId, userId: req.user.user_id });
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
     }
-
-    await post.destroy();
+    await post.deleteOne();
     res.json({ success: true, message: 'Post deleted successfully' });
   } catch (error) {
     logger.error('Delete post error', { error: error.message });
@@ -155,30 +94,27 @@ exports.deletePost = async (req, res) => {
 };
 
 /**
- * POST /api/community/posts/:postId/like
- * Like or unlike a post (toggle)
+ * POST /api/community/posts/:postId/like — toggle like
  */
 exports.toggleLike = async (req, res) => {
   try {
     const userId = req.user.user_id;
-    const { postId } = req.params;
-
-    const post = await Post.findByPk(postId);
+    const post = await Post.findById(req.params.postId);
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
     }
 
-    const existing = await PostLike.findOne({ where: { post_id: postId, user_id: userId } });
-
-    if (existing) {
-      await existing.destroy();
-      await post.decrement('likes_count');
-      res.json({ success: true, liked: false, likesCount: post.likes_count - 1 });
+    const alreadyLiked = post.likedBy.includes(userId);
+    if (alreadyLiked) {
+      post.likedBy.pull(userId);
+      post.likesCount = Math.max(0, post.likesCount - 1);
     } else {
-      await PostLike.create({ post_id: postId, user_id: userId });
-      await post.increment('likes_count');
-      res.json({ success: true, liked: true, likesCount: post.likes_count + 1 });
+      post.likedBy.push(userId);
+      post.likesCount += 1;
     }
+    await post.save();
+
+    res.json({ success: true, liked: !alreadyLiked, likesCount: post.likesCount });
   } catch (error) {
     logger.error('Toggle like error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to toggle like' } });
@@ -187,45 +123,37 @@ exports.toggleLike = async (req, res) => {
 
 /**
  * POST /api/community/posts/:postId/comments
- * Add a comment to a post
  */
 exports.addComment = async (req, res) => {
   try {
-    const userId = req.user.user_id;
-    const { postId } = req.params;
     const { comment } = req.body;
-
-    if (!comment || comment.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'MISSING_REQUIRED_PARAMS', message: 'Comment text is required' }
-      });
+    if (!comment?.trim()) {
+      return res.status(400).json({ success: false, error: { code: 'MISSING_REQUIRED_PARAMS', message: 'Comment is required' } });
     }
 
-    const post = await Post.findByPk(postId);
+    const post = await Post.findById(req.params.postId);
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
     }
 
-    const newComment = await PostComment.create({
-      post_id: postId,
-      user_id: userId,
+    const newComment = {
+      userId: req.user.user_id,
+      authorName: req.user.name,
       comment: comment.trim()
-    });
+    };
 
-    await post.increment('comments_count');
+    post.comments.push(newComment);
+    post.commentsCount += 1;
+    await post.save();
 
-    const fullComment = await PostComment.findByPk(newComment.comment_id, {
-      include: [{ model: User, as: 'author', attributes: ['user_id', 'name'] }]
-    });
-
+    const addedComment = post.comments[post.comments.length - 1];
     res.status(201).json({
       success: true,
       data: {
-        commentId: fullComment.comment_id,
-        author: { id: fullComment.author?.user_id, name: fullComment.author?.name },
-        comment: fullComment.comment,
-        createdAt: fullComment.created_at
+        commentId: addedComment._id,
+        author: { id: addedComment.userId, name: addedComment.authorName },
+        comment: addedComment.comment,
+        createdAt: addedComment.createdAt
       }
     });
   } catch (error) {
@@ -236,25 +164,22 @@ exports.addComment = async (req, res) => {
 
 /**
  * DELETE /api/community/posts/:postId/comments/:commentId
- * Delete own comment
  */
 exports.deleteComment = async (req, res) => {
   try {
-    const userId = req.user.user_id;
-    const { postId, commentId } = req.params;
+    const post = await Post.findById(req.params.postId);
+    if (!post) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
+    }
 
-    const comment = await PostComment.findOne({
-      where: { comment_id: commentId, post_id: postId, user_id: userId }
-    });
-
-    if (!comment) {
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment || comment.userId !== req.user.user_id) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Comment not found' } });
     }
 
-    await comment.destroy();
-
-    const post = await Post.findByPk(postId);
-    if (post && post.comments_count > 0) await post.decrement('comments_count');
+    comment.deleteOne();
+    post.commentsCount = Math.max(0, post.commentsCount - 1);
+    await post.save();
 
     res.json({ success: true, message: 'Comment deleted successfully' });
   } catch (error) {
@@ -265,29 +190,47 @@ exports.deleteComment = async (req, res) => {
 
 /**
  * GET /api/community/users/:userId/posts
- * Get all posts by a specific user
  */
 exports.getUserPosts = async (req, res) => {
   try {
-    const { userId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
-    const { count, rows } = await Post.findAndCountAll({
-      where: { user_id: userId },
-      include: POST_INCLUDE,
-      order: [['created_at', 'DESC']],
-      limit, offset, distinct: true
-    });
+    const [posts, total] = await Promise.all([
+      Post.find({ userId: parseInt(req.params.userId) }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Post.countDocuments({ userId: parseInt(req.params.userId) })
+    ]);
 
     res.json({
       success: true,
-      data: rows.map(p => formatPost(p)),
-      pagination: { page, limit, total: count, pages: Math.ceil(count / limit) }
+      data: posts.map(formatPost),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
     logger.error('Get user posts error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load posts' } });
   }
 };
+
+// ─── Formatter ───────────────────────────────────────────────────────────────
+function formatPost(post) {
+  return {
+    postId: post._id,
+    author: { id: post.userId, name: post.authorName },
+    caption: post.caption,
+    images: post.images || [],
+    place: post.placeId ? { id: post.placeId, name: post.placeName, type: post.placeType } : null,
+    rating: post.rating || null,
+    visitDate: post.visitDate,
+    likesCount: post.likesCount,
+    commentsCount: post.commentsCount,
+    recentComments: (post.comments || []).slice(-3).map(c => ({
+      commentId: c._id,
+      author: { id: c.userId, name: c.authorName },
+      comment: c.comment,
+      createdAt: c.createdAt
+    })),
+    createdAt: post.createdAt
+  };
+}

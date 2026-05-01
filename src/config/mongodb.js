@@ -9,16 +9,12 @@ const connectMongoDB = async () => {
       return null;
     }
 
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log('📦 MongoDB collections: posts, reviews, ai_conversations, ai_trip_plans, place_cache, search_history');
     return conn;
   } catch (error) {
-    console.error('MongoDB connection error:', error);
-    // Don't exit process, allow app to continue with MySQL only
+    console.error('MongoDB connection error:', error.message);
     return null;
   }
 };
