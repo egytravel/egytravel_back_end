@@ -376,3 +376,59 @@ exports.deleteBooking = async (req, res) => {
     });
   }
 };
+
+/**
+ * Create flight booking record
+ * POST /api/bookings/flight
+ */
+exports.createFlightBooking = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const {
+      flightId, airline, flightNumber,
+      departureAirport, arrivalAirport,
+      departureCity, arrivalCity,
+      departureDate, arrivalDate,
+      passengers, cabinClass,
+      totalPrice, currency,
+      bookingUrl, tripId, notes
+    } = req.body;
+
+    if (!departureAirport || !arrivalAirport || !departureDate) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_REQUIRED_PARAMS', message: 'departureAirport, arrivalAirport, and departureDate are required' }
+      });
+    }
+
+    const booking = await Booking.create({
+      user_id: userId,
+      trip_id: tripId || null,
+      booking_type: 'flight',
+      provider: 'Booking.com',
+      booking_url: bookingUrl || null,
+      status: 'pending',
+      total_price: totalPrice || null,
+      currency: currency || 'USD',
+      flight_id: flightId || null,
+      airline: airline || null,
+      flight_number: flightNumber || null,
+      departure_airport: departureAirport,
+      arrival_airport: arrivalAirport,
+      departure_city: departureCity || null,
+      arrival_city: arrivalCity || null,
+      departure_date: departureDate,
+      arrival_date: arrivalDate || null,
+      passengers: passengers || 1,
+      cabin_class: cabinClass?.toLowerCase() || 'economy',
+      notes: notes || null
+    });
+
+    logger.info('Flight booking created', { bookingId: booking.booking_id, userId });
+
+    res.status(201).json({ success: true, data: booking.toJSON() });
+  } catch (error) {
+    logger.error('Create flight booking error', { error: error.message });
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create flight booking' } });
+  }
+};

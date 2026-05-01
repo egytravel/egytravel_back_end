@@ -6,13 +6,11 @@ const { authenticateToken } = require('../middleware/auth');
 // All booking routes require authentication
 router.use(authenticateToken);
 
-/**
- * @route   POST /api/bookings/hotel
- * @desc    Create hotel booking
- * @access  Private (authenticated users)
- * @body    hotelId, hotelName, hotelLocation, checkinDate, checkoutDate, guests, rooms, tripId, totalPrice, currency
- */
+// POST /api/bookings/hotel — save hotel booking
 router.post('/hotel', bookingController.createHotelBooking);
+
+// POST /api/bookings/flight — save flight booking
+router.post('/flight', bookingController.createFlightBooking);
 
 /**
  * @route   GET /api/bookings
