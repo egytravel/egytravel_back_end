@@ -1,4 +1,4 @@
-const { places: staticPlaces, restaurants: staticRestaurants, curatedHotels, popularFlightRoutes } = require('../data/exploreData');
+const { places: staticPlaces, restaurants: fallbackRestaurants, curatedHotels, popularFlightRoutes } = require('../data/exploreData');
 const openTripMapService = require('../services/openTripMapService');
 const bookingHotelService = require('../services/bookingComRapidService');
 const bookingFlightService = require('../services/bookingComFlightService');
@@ -33,9 +33,13 @@ exports.getExploreData = async (req, res) => {
     let hotels = curatedHotels.slice(0, 4); // fallback
     let flights = popularFlightRoutes;       // fallback
 
-    const [hotelsResult, flightsResult] = await Promise.allSettled([
+    // Fetch real restaurants for Cairo from Google in parallel
+    let restaurants = fallbackRestaurants.slice(0, 4); // fallback
+
+    const [hotelsResult, flightsResult, restaurantsResult] = await Promise.allSettled([
       bookingHotelService.searchHotels({ cityCode: 'CAI', checkin, checkout, adults: 2, rooms: 1 }),
-      bookingFlightService.searchFlights({ origin: 'CAI', destination: 'LXR', departureDate: checkin, adults: 1 })
+      bookingFlightService.searchFlights({ origin: 'CAI', destination: 'LXR', departureDate: checkin, adults: 1 }),
+      searchRestaurants('Cairo', null, 30.0444, 31.2357, 4)
     ]);
 
     if (hotelsResult.status === 'fulfilled' && hotelsResult.value.length > 0) {
@@ -44,13 +48,16 @@ exports.getExploreData = async (req, res) => {
     if (flightsResult.status === 'fulfilled' && flightsResult.value.length > 0) {
       flights = flightsResult.value.slice(0, 4);
     }
+    if (restaurantsResult.status === 'fulfilled' && restaurantsResult.value?.length > 0) {
+      restaurants = restaurantsResult.value.slice(0, 4);
+    }
 
     res.json({
       success: true,
       data: {
         categories: CATEGORIES,
         popularPlaces: staticPlaces,
-        restaurants: staticRestaurants.slice(0, 4),
+        restaurants,
         hotels,
         flights
       }
@@ -234,7 +241,7 @@ exports.getRestaurants = async (req, res) => {
     }
 
     // Fallback to static data
-    let results = [...staticRestaurants];
+    let results = [...fallbackRestaurants];
     if (city) results = results.filter(r => r.city.toLowerCase() === city.toLowerCase());
     if (cuisine) results = results.filter(r => r.category === cuisine);
 
@@ -262,7 +269,7 @@ exports.getRestaurantById = async (req, res) => {
     }
 
     // Fallback to static data
-    const restaurant = staticRestaurants.find(r => r.id === id);
+    const restaurant = fallbackRestaurants.find(r => r.id === id);
     if (!restaurant) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Restaurant not found' } });
     }
