@@ -20,6 +20,12 @@ router.get('/:tripId/days/:dayId', tripDayController.getDay);
 router.put('/:tripId/days/:dayId', tripDayController.updateDay);
 router.delete('/:tripId/days/:dayId', tripDayController.deleteDay);
 
+// ─── Places within a day ──────────────────────────────────────────────────────
+// POST /api/trips/:tripId/days/:dayId/places — add a place/destination to a day
+router.post('/:tripId/days/:dayId/places', tripDayController.addPlaceToDay);
+// DELETE /api/trips/:tripId/days/:dayId/places/:placeIndex — remove a place from a day
+router.delete('/:tripId/days/:dayId/places/:placeIndex', tripDayController.removePlaceFromDay);
+
 // ─── Trip Map ─────────────────────────────────────────────────────────────────
 // GET /api/trips/:tripId/map — all locations across all days as map markers
 router.get('/:tripId/map', tripDayController.getTripMapMarkers);

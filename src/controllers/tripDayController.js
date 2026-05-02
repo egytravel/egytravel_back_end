@@ -242,3 +242,101 @@ exports.deleteDay = async (req, res) => {
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to delete day' } });
   }
 };
+
+/**
+ * POST /api/trips/:tripId/days/:dayId/places
+ * Add a place/destination to a specific day
+ * Accepts a destination ID (from /api/home/destinations) or a free-form place
+ */
+exports.addPlaceToDay = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { tripId, dayId } = req.params;
+    const { placeId, name, lat, lng, type = 'place', notes } = req.body;
+
+    if (!name || lat === undefined || lng === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'MISSING_REQUIRED_PARAMS', message: 'name, lat, and lng are required' }
+      });
+    }
+
+    const trip = await findUserTrip(tripId, userId);
+    if (!trip) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Trip not found' } });
+    }
+
+    const day = await TripDay.findOne({ where: { day_id: dayId, trip_id: tripId } });
+    if (!day) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Day not found' } });
+    }
+
+    // Add to locations array
+    const locations = day.locations || [];
+    const newPlace = {
+      id: placeId || null,
+      name,
+      lat: parseFloat(lat),
+      lng: parseFloat(lng),
+      type,  // 'place', 'hotel', 'restaurant', 'destination'
+      notes: notes || null
+    };
+    locations.push(newPlace);
+    day.locations = locations;
+
+    // Also add to activities as a text entry
+    const activities = day.activities || [];
+    activities.push(`Visit ${name}`);
+    day.activities = activities;
+
+    await day.save();
+
+    logger.info('Place added to day', { dayId, tripId, userId, name });
+    res.status(201).json({
+      success: true,
+      data: {
+        day: day.toJSON(),
+        addedPlace: newPlace
+      }
+    });
+  } catch (error) {
+    logger.error('Add place to day error', { error: error.message });
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to add place to day' } });
+  }
+};
+
+/**
+ * DELETE /api/trips/:tripId/days/:dayId/places/:placeIndex
+ * Remove a place from a specific day by its index in the locations array
+ */
+exports.removePlaceFromDay = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { tripId, dayId, placeIndex } = req.params;
+    const idx = parseInt(placeIndex);
+
+    const trip = await findUserTrip(tripId, userId);
+    if (!trip) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Trip not found' } });
+    }
+
+    const day = await TripDay.findOne({ where: { day_id: dayId, trip_id: tripId } });
+    if (!day) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Day not found' } });
+    }
+
+    const locations = day.locations || [];
+    if (idx < 0 || idx >= locations.length) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_INDEX', message: 'Invalid place index' } });
+    }
+
+    const removed = locations.splice(idx, 1)[0];
+    day.locations = locations;
+    await day.save();
+
+    res.json({ success: true, message: `Removed "${removed.name}" from day`, data: day.toJSON() });
+  } catch (error) {
+    logger.error('Remove place from day error', { error: error.message });
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to remove place' } });
+  }
+};
