@@ -56,7 +56,7 @@ exports.getExploreData = async (req, res) => {
       success: true,
       data: {
         categories: CATEGORIES,
-        popularPlaces: staticPlaces,
+        popularPlaces: staticPlaces.map(p => ({ ...p, coverImage: p.image || p.coverImage || null })),
         restaurants,
         hotels,
         flights
@@ -210,7 +210,7 @@ exports.getPlaceById = async (req, res) => {
 exports.getRestaurants = async (req, res) => {
   try {
     const { city = 'Cairo', cuisine, limit } = req.query;
-    const limitNum = Math.min(parseInt(limit) || 10, 20);
+    const limitNum = Math.min(parseInt(limit) || 20, 40); // default 20, max 40
 
     // City center coordinates for location bias
     const cityCenters = {

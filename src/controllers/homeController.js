@@ -12,24 +12,27 @@ exports.getHomeData = async (req, res) => {
     const featured = destinations.filter(d => d.featured);
     const popular = destinations.filter(d => d.popular);
 
-    // Enrich featured destinations with Google photos for the hero slider
-    const enrichFeatured = await Promise.all(
-      featured.map(async (d) => {
-        if (!process.env.GOOGLE_PLACES_API_KEY) return d;
-        const googleData = await getReviewsForDestination(
-          d.id, d.googleSearchName || d.name, d.lat, d.lng
-        ).catch(() => null);
-        if (!googleData?.photos?.length) return d;
-        const urls = googleData.photos.map(p => p.url);
-        return { ...d, images: urls, coverImage: urls[0] };
-      })
-    );
+    // Enrich featured AND popular destinations with Google photos
+    const enrichWithGoogle = async (d) => {
+      if (!process.env.GOOGLE_PLACES_API_KEY) return d;
+      const googleData = await getReviewsForDestination(
+        d.id, d.googleSearchName || d.name, d.lat, d.lng
+      ).catch(() => null);
+      if (!googleData?.photos?.length) return d;
+      const urls = googleData.photos.map(p => p.url);
+      return { ...d, images: urls, coverImage: urls[0] };
+    };
+
+    const [enrichFeatured, enrichPopular] = await Promise.all([
+      Promise.all(featured.map(enrichWithGoogle)),
+      Promise.all(popular.map(enrichWithGoogle))
+    ]);
 
     res.json({
       success: true,
       data: {
         featured: enrichFeatured,
-        popular,
+        popular: enrichPopular,
         destinations: cities
       }
     });

@@ -31,6 +31,9 @@ router.post('/posts/:postId/like', authenticateToken, communityController.toggle
 // POST /api/community/posts/:postId/comments — add comment
 router.post('/posts/:postId/comments', authenticateToken, communityController.addComment);
 
+// GET /api/community/posts/:postId/comments — get all comments (paginated)
+router.get('/posts/:postId/comments', communityController.getComments);
+
 // DELETE /api/community/posts/:postId/comments/:commentId — delete comment
 router.delete('/posts/:postId/comments/:commentId', authenticateToken, communityController.deleteComment);
 

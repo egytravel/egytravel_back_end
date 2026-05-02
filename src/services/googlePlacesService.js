@@ -175,9 +175,7 @@ async function searchRestaurants(city, cuisine = null, lat, lng, limit = 10) {
       rating: r.rating || 0,
       priceLevel: r.price_level || null,
       priceDisplay: r.price_level ? '$'.repeat(r.price_level) : '$',
-      coverImage: r.photos?.[0]
-        ? `${process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com'}/api/places/photo?ref=${r.photos[0].photo_reference}`
-        : null,
+      coverImage: r.photos?.[0] ? shortPhotoUrl(r.photos[0].photo_reference) : null,
       lat: r.geometry?.location?.lat || lat,
       lng: r.geometry?.location?.lng || lng,
       isOpen: r.opening_hours?.open_now ?? null,

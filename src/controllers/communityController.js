@@ -222,8 +222,44 @@ exports.deleteComment = async (req, res) => {
 };
 
 /**
- * GET /api/community/users/:userId/posts
+ * GET /api/community/posts/:postId/comments?page=1&limit=20
+ * Get all comments for a post with pagination
  */
+exports.getComments = async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.postId)) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_POST_ID', message: 'Invalid post ID. Use the postId from the feed response.' } });
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+
+    const post = await Post.findById(req.params.postId).lean();
+    if (!post) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
+    }
+
+    const allComments = post.comments || [];
+    const total = allComments.length;
+    const offset = (page - 1) * limit;
+    const pageComments = allComments.slice(offset, offset + limit);
+
+    res.json({
+      success: true,
+      postId: req.params.postId,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit), hasMore: offset + limit < total },
+      data: pageComments.map(c => ({
+        commentId: c._id,
+        author: { id: c.userId, name: c.authorName },
+        comment: c.comment,
+        createdAt: c.createdAt
+      }))
+    });
+  } catch (error) {
+    logger.error('Get comments error', { error: error.message });
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to get comments' } });
+  }
+};
 exports.getUserPosts = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -258,7 +294,7 @@ function formatPost(post) {
     visitDate: post.visitDate,
     likesCount: post.likesCount,
     commentsCount: post.commentsCount,
-    recentComments: (post.comments || []).slice(-3).map(c => ({
+    recentComments: (post.comments || []).slice(-5).map(c => ({
       commentId: c._id,
       author: { id: c.userId, name: c.authorName },
       comment: c.comment,
