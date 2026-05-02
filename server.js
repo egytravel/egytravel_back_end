@@ -141,6 +141,57 @@ app.get('/api/places/photo', async (req, res) => {
   }
 });
 
+// ─── General Image Proxy ──────────────────────────────────────────────────────
+// GET /api/image-proxy?url=ENCODED_URL
+// Proxies any external image through our server so Flutter can load it reliably
+// Handles CDN URLs from Booking.com, airline logos, etc.
+app.get('/api/image-proxy', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'url parameter is required' });
+
+  // Only allow known safe domains
+  const allowedDomains = [
+    'cf.bstatic.com',       // Booking.com hotel photos
+    'q-xx.bstatic.com',     // Booking.com CDN
+    't-cf.bstatic.com',     // Booking.com CDN
+    'r-xx.bstatic.com',     // Booking.com CDN
+    'logos.skyscnr.com',    // Skyscanner airline logos
+    'images.kiwi.com',      // Kiwi.com
+    'content.r9cdn.net',    // Booking.com flights
+    'booking.com',          // General Booking.com
+  ];
+
+  let decodedUrl;
+  try {
+    decodedUrl = decodeURIComponent(url);
+    const urlObj = new URL(decodedUrl);
+    const isAllowed = allowedDomains.some(d => urlObj.hostname.includes(d));
+    if (!isAllowed) {
+      return res.status(403).json({ error: 'Domain not allowed' });
+    }
+  } catch {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  try {
+    const response = await axios.get(decodedUrl, {
+      responseType: 'stream',
+      timeout: 10000,
+      maxRedirects: 5,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; EgyTravel/1.0)',
+        'Accept': 'image/*'
+      }
+    });
+    res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    response.data.pipe(res);
+  } catch (error) {
+    logger.error('Image proxy error', { url: decodedUrl?.substring(0, 60), error: error.message });
+    res.status(502).json({ error: 'Failed to fetch image' });
+  }
+});
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({

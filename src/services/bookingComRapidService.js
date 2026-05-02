@@ -5,6 +5,13 @@ const logger = require('../utils/logger');
 const BASE_URL = 'https://booking-com.p.rapidapi.com/v1';
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = 'booking-com.p.rapidapi.com';
+const APP_URL = process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com';
+
+// Wrap a Booking.com CDN URL through our image proxy so Flutter can load it reliably
+function proxyImage(url) {
+  if (!url) return null;
+  return `${APP_URL}/api/image-proxy?url=${encodeURIComponent(url)}`;
+}
 
 // Egyptian city destination IDs from Booking.com
 const CITY_DEST_IDS = {
@@ -113,9 +120,10 @@ async function getHotelPhotos(hotelId) {
       timeout: 10000
     });
 
-    const photos = (response.data || []).slice(0, 10).map(p =>
-      p.url_max?.replace('{size}', '800x600') || p.url_original || p.url_square60
-    ).filter(Boolean);
+    const photos = (response.data || []).slice(0, 10).map(p => {
+      const raw = p.url_max?.replace('{size}', '800x600') || p.url_original || p.url_square60;
+      return proxyImage(raw);
+    }).filter(Boolean);
 
     cacheService.set(cacheKey, photos, 86400);
     return photos;
@@ -145,8 +153,8 @@ function formatHotel(h) {
       currency: h.currency_code || 'USD',
       perNight: true
     },
-    coverImage: h.main_photo_url?.replace('square60', 'max1280x900') || null,
-    thumbnail: h.main_photo_url || null,
+    coverImage: proxyImage(h.main_photo_url?.replace('square60', 'max1280x900')),
+    thumbnail: proxyImage(h.main_photo_url),
     available: true,
     bookingUrl: `https://www.booking.com/hotel/${h.url?.split('/hotel/')[1] || ''}`,
     source: 'booking.com'

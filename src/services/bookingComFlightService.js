@@ -5,6 +5,12 @@ const logger = require('../utils/logger');
 const BASE_URL = 'https://booking-com.p.rapidapi.com/v1';
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 const RAPIDAPI_HOST = 'booking-com.p.rapidapi.com';
+const APP_URL = process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com';
+
+function proxyImage(url) {
+  if (!url) return null;
+  return `${APP_URL}/api/image-proxy?url=${encodeURIComponent(url)}`;
+}
 
 // Egyptian airport codes mapped to Booking.com format
 const AIRPORT_CODES = {
@@ -114,7 +120,7 @@ function formatFlight(offer, originCode, destCode) {
     airline: {
       name: leg?.carriersData?.[0]?.name || '',
       code: leg?.carriersData?.[0]?.code || '',
-      logo: leg?.carriersData?.[0]?.logo || ''
+      logo: proxyImage(leg?.carriersData?.[0]?.logo)
     },
     flightNumber: `${leg?.flightInfo?.carrierInfo?.operatingCarrier || ''}${leg?.flightInfo?.flightNumber || ''}`,
     departure: {
