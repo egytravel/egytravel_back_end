@@ -28,9 +28,40 @@ exports.createTrip = async (req, res) => {
       status: 'planning'
     });
 
-    logger.info('Trip created', { tripId: trip.trip_id, userId });
+    // Auto-create day entries if both dates are provided (like Wanderlog)
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffMs = end - start;
+      const numDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
 
-    res.status(201).json({ success: true, data: trip.toJSON() });
+      if (numDays <= 30) { // safety cap
+        const dayEntries = [];
+        for (let i = 0; i < numDays; i++) {
+          const dayDate = new Date(start);
+          dayDate.setDate(start.getDate() + i);
+          dayEntries.push({
+            trip_id: trip.trip_id,
+            day_number: i + 1,
+            date: dayDate.toISOString().split('T')[0],
+            title: `Day ${i + 1}`,
+            activities: [],
+            locations: []
+          });
+        }
+        await TripDay.bulkCreate(dayEntries);
+        logger.info('Auto-created trip days', { tripId: trip.trip_id, numDays });
+      }
+    }
+
+    // Return trip with days included
+    const tripWithDays = await Trip.findOne({
+      where: { trip_id: trip.trip_id },
+      include: [{ model: TripDay, as: 'days', order: [['day_number', 'ASC']] }]
+    });
+
+    logger.info('Trip created', { tripId: trip.trip_id, userId });
+    res.status(201).json({ success: true, data: tripWithDays.toJSON() });
   } catch (error) {
     logger.error('Create trip error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create trip' } });
