@@ -147,16 +147,15 @@ function formatFlight(offer, originCode, destCode) {
     },
     baggage: offer.includedCheckedBags || null,
     bookingToken: offer.token,
-    // Build a proper Booking.com flight search URL with the actual route and date
-    // The token-based URL doesn't work publicly — use the search URL instead
+    // Google Flights deep link — reliable direct link to the specific route and date
     bookingUrl: (() => {
       const from = leg?.departureAirport?.code || originCode;
       const to = leg?.arrivalAirport?.code || destCode;
       const date = leg?.departureTime ? leg.departureTime.split('T')[0] : '';
       if (from && to && date) {
-        return `https://www.booking.com/flights/search.html?from=${from}&to=${to}&depart=${date}&adults=1&type=ONEWAY`;
+        return `https://www.google.com/travel/flights?q=flights+from+${from}+to+${to}+on+${date}`;
       }
-      return `https://www.booking.com/flights/search.html?from=${originCode}&to=${destCode}`;
+      return `https://www.google.com/travel/flights?q=flights+from+${from}+to+${to}`;
     })(),
     source: 'booking.com'
   };

@@ -401,7 +401,7 @@ const popularFlightRoutes = [
     airline: 'EgyptAir',
     airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
     frequency: 'Daily',
-    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
+    bookingUrl: 'https://www.google.com/travel/flights?q=flights+from+CAI+to+LXR'
   },
   {
     id: 'cai-asw',
@@ -419,7 +419,7 @@ const popularFlightRoutes = [
     airline: 'EgyptAir',
     airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
     frequency: 'Daily',
-    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
+    bookingUrl: 'https://www.google.com/travel/flights?q=flights+from+CAI+to+ASW'
   },
   {
     id: 'cai-hrg',
@@ -437,7 +437,7 @@ const popularFlightRoutes = [
     airline: 'EgyptAir',
     airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
     frequency: 'Daily',
-    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
+    bookingUrl: 'https://www.google.com/travel/flights?q=flights+from+CAI+to+HRG'
   },
   {
     id: 'cai-ssh',
@@ -455,7 +455,7 @@ const popularFlightRoutes = [
     airline: 'EgyptAir',
     airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
     frequency: 'Daily',
-    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
+    bookingUrl: 'https://www.google.com/travel/flights?q=flights+from+CAI+to+SSH'
   },
   {
     id: 'cai-aly',
@@ -473,7 +473,7 @@ const popularFlightRoutes = [
     airline: 'EgyptAir',
     airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
     frequency: 'Daily',
-    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
+    bookingUrl: 'https://www.google.com/travel/flights?q=flights+from+CAI+to+ALY'
   }
 ];
 
