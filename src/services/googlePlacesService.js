@@ -1,9 +1,22 @@
 const axios = require('axios');
 const cacheService = require('./cacheService');
 const logger = require('../utils/logger');
+const crypto = require('crypto');
 
 const BASE_URL = 'https://maps.googleapis.com/maps/api/place';
 const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+const APP_URL = process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com';
+
+/**
+ * Store a photo_reference with a short hash key and return a short proxy URL
+ * This avoids 500+ character URLs that break some HTTP clients
+ */
+function shortPhotoUrl(photoReference) {
+  const hash = crypto.createHash('sha1').update(photoReference).digest('hex').substring(0, 16);
+  // Store hash → reference mapping in cache for 24 hours
+  cacheService.set(`photo_ref_${hash}`, photoReference, 86400);
+  return `${APP_URL}/api/places/photo?id=${hash}`;
+}
 
 /**
  * Search for a place by name and location to get its Google Place ID
@@ -87,8 +100,7 @@ async function getPlaceDetails(placeId) {
       })),
       photos: (result.photos || []).slice(0, 5).map(p => ({
         reference: p.photo_reference,
-        // Full proxy URL — client calls our server which fetches from Google server-side
-        url: `${process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com'}/api/places/photo?ref=${p.photo_reference}`
+        url: shortPhotoUrl(p.photo_reference)
       }))
     };
 
@@ -223,8 +235,8 @@ async function getRestaurantDetails(placeId) {
       lat: r.geometry?.location?.lat || null,
       lng: r.geometry?.location?.lng || null,
       mapLocation: r.geometry?.location || null,
-      images: (r.photos || []).slice(0, 5).map(p => `${BASE}/api/places/photo?ref=${p.photo_reference}`),
-      coverImage: r.photos?.[0] ? `${BASE}/api/places/photo?ref=${r.photos[0].photo_reference}` : null,
+      images: (r.photos || []).slice(0, 5).map(p => shortPhotoUrl(p.photo_reference)),
+      coverImage: r.photos?.[0] ? shortPhotoUrl(r.photos[0].photo_reference) : null,
       reviews: (r.reviews || []).map(rev => ({
         id: `google_${rev.time}`,
         source: 'google',

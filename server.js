@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const sequelize = require('./src/config/database');
 const connectMongoDB = require('./src/config/mongodb');
 const logger = require('./src/utils/logger');
+const cacheService = require('./src/services/cacheService');
 
 // Import routes
 const authRoutes = require('./src/routes/auth');
@@ -118,25 +119,37 @@ app.use('/api/community', communityRoutes);
 app.use('/api/events', eventRoutes);
 
 // ─── Google Places Photo Proxy ────────────────────────────────────────────────
-// GET /api/places/photo?ref=PHOTO_REFERENCE&maxwidth=800
-// Proxies Google photo requests server-side so the API key is never exposed to clients
+// GET /api/places/photo?id=SHORT_HASH  (new — short URL, Flutter-friendly)
+// GET /api/places/photo?ref=FULL_REFERENCE  (legacy fallback)
 app.get('/api/places/photo', async (req, res) => {
-  const { ref, maxwidth = 800 } = req.query;
-  if (!ref) return res.status(400).json({ error: 'ref parameter is required' });
+  let photoReference;
+
+  if (req.query.id) {
+    // Look up the full reference from the short hash
+    photoReference = cacheService.get(`photo_ref_${req.query.id}`);
+    if (!photoReference) {
+      return res.status(404).json({ error: 'Photo not found or expired. Refresh the destination data.' });
+    }
+  } else if (req.query.ref) {
+    photoReference = req.query.ref;
+  } else {
+    return res.status(400).json({ error: 'id or ref parameter is required' });
+  }
+
   if (!process.env.GOOGLE_PLACES_API_KEY) return res.status(503).json({ error: 'Photo service not configured' });
 
   try {
     const response = await axios.get('https://maps.googleapis.com/maps/api/place/photo', {
-      params: { maxwidth, photo_reference: ref, key: process.env.GOOGLE_PLACES_API_KEY },
+      params: { maxwidth: req.query.maxwidth || 800, photo_reference: photoReference, key: process.env.GOOGLE_PLACES_API_KEY },
       responseType: 'stream',
       timeout: 10000,
       maxRedirects: 5
     });
     res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400'); // cache 24h in browser
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     response.data.pipe(res);
   } catch (error) {
-    logger.error('Photo proxy error', { ref: ref?.substring(0, 20), error: error.message });
+    logger.error('Photo proxy error', { error: error.message });
     res.status(502).json({ error: 'Failed to fetch photo' });
   }
 });
