@@ -11,32 +11,27 @@ const bookingConfig = require('../config/bookingcom');
  * @returns {string} Affiliate link
  */
 function generateAffiliateLink({ hotelId, checkin, checkout, guests = 2, rooms = 1 }) {
-  if (!bookingConfig.affiliateId) {
-    throw new Error('Booking.com affiliate ID not configured');
-  }
-  
   if (!hotelId || !checkin || !checkout) {
     throw new Error('Missing required parameters: hotelId, checkin, checkout');
   }
-  
-  // Base URL for Booking.com hotels
+
   const baseUrl = 'https://www.booking.com/hotel/eg';
-  
-  // Build query parameters
-  const params = new URLSearchParams({
-    aid: bookingConfig.affiliateId, // EgyTravel's affiliate ID
-    checkin: checkin,
-    checkout: checkout,
+
+  const paramObj = {
+    checkin,
+    checkout,
     group_adults: guests,
     no_rooms: rooms,
     selected_currency: 'USD'
-  });
-  
-  // Construct full URL
-  // Format: https://www.booking.com/hotel/eg/hotel-slug.html?aid=123&checkin=2025-12-01...
-  const affiliateLink = `${baseUrl}/${hotelId}.html?${params.toString()}`;
-  
-  return affiliateLink;
+  };
+
+  // Include affiliate ID only if configured
+  if (bookingConfig.affiliateId) {
+    paramObj.aid = bookingConfig.affiliateId;
+  }
+
+  const params = new URLSearchParams(paramObj);
+  return `${baseUrl}/${hotelId}.html?${params.toString()}`;
 }
 
 /**
