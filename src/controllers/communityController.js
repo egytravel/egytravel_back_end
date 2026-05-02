@@ -20,7 +20,7 @@ exports.getFeed = async (req, res) => {
 
     res.json({
       success: true,
-      data: posts.map(formatPost),
+      data: posts.map(p => formatPost(p, req.user?.user_id || null)),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
@@ -53,7 +53,7 @@ exports.createPost = async (req, res) => {
     });
 
     logger.info('Post created', { postId: post._id, userId: req.user.user_id });
-    res.status(201).json({ success: true, data: formatPost(post.toObject()) });
+    res.status(201).json({ success: true, data: formatPost(post.toObject(), req.user.user_id) });
   } catch (error) {
     logger.error('Create post error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create post' } });
@@ -77,7 +77,7 @@ exports.getPost = async (req, res) => {
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
     }
-    res.json({ success: true, data: formatPost(post) });
+    res.json({ success: true, data: formatPost(post, req.user?.user_id || null) });
   } catch (error) {
     logger.error('Get post error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load post' } });
@@ -273,7 +273,7 @@ exports.getUserPosts = async (req, res) => {
 
     res.json({
       success: true,
-      data: posts.map(formatPost),
+      data: posts.map(p => formatPost(p, req.user?.user_id || null)),
       pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
@@ -283,7 +283,7 @@ exports.getUserPosts = async (req, res) => {
 };
 
 // ─── Formatter ───────────────────────────────────────────────────────────────
-function formatPost(post) {
+function formatPost(post, currentUserId = null) {
   return {
     postId: post._id,
     author: { id: post.userId, name: post.authorName },
@@ -293,6 +293,7 @@ function formatPost(post) {
     rating: post.rating || null,
     visitDate: post.visitDate,
     likesCount: post.likesCount,
+    isLiked: currentUserId ? (post.likedBy || []).includes(currentUserId) : false,
     commentsCount: post.commentsCount,
     recentComments: (post.comments || []).slice(-5).map(c => ({
       commentId: c._id,

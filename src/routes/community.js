@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const communityController = require('../controllers/communityController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 
 const postLimiter = rateLimit({
@@ -11,13 +11,13 @@ const postLimiter = rateLimit({
 });
 
 // GET /api/community/feed?page=1&limit=10&placeId=pyramids-of-giza
-router.get('/feed', communityController.getFeed);
+router.get('/feed', optionalAuth, communityController.getFeed);
 
 // GET /api/community/posts/:postId
-router.get('/posts/:postId', communityController.getPost);
+router.get('/posts/:postId', optionalAuth, communityController.getPost);
 
 // GET /api/community/users/:userId/posts
-router.get('/users/:userId/posts', communityController.getUserPosts);
+router.get('/users/:userId/posts', optionalAuth, communityController.getUserPosts);
 
 // POST /api/community/posts — create post (auth required)
 router.post('/posts', authenticateToken, postLimiter, communityController.createPost);
