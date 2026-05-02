@@ -194,10 +194,10 @@ exports.searchDestinations = async (req, res) => {
   try {
     const { q } = req.query;
 
-    if (!q || q.trim().length < 2) {
+    if (!q || q.trim().length < 1) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Search query must be at least 2 characters' }
+        error: { code: 'VALIDATION_ERROR', message: 'Search query is required' }
       });
     }
 
@@ -207,6 +207,8 @@ exports.searchDestinations = async (req, res) => {
       d.name.toLowerCase().includes(keyword) ||
       d.city.toLowerCase().includes(keyword) ||
       d.location.toLowerCase().includes(keyword) ||
+      (d.description && d.description.toLowerCase().includes(keyword)) ||
+      (d.shortDescription && d.shortDescription.toLowerCase().includes(keyword)) ||
       d.tags.some(tag => tag.toLowerCase().includes(keyword)) ||
       d.category.toLowerCase().includes(keyword)
     );
@@ -294,10 +296,10 @@ exports.mapSearch = async (req, res) => {
   try {
     const { q, category, city } = req.query;
 
-    if (!q || q.trim().length < 2) {
+    if (!q || q.trim().length < 1) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Search query must be at least 2 characters' }
+        error: { code: 'VALIDATION_ERROR', message: 'Search query is required' }
       });
     }
 
@@ -307,6 +309,8 @@ exports.mapSearch = async (req, res) => {
       d.name.toLowerCase().includes(keyword) ||
       d.city.toLowerCase().includes(keyword) ||
       d.location.toLowerCase().includes(keyword) ||
+      (d.description && d.description.toLowerCase().includes(keyword)) ||
+      (d.shortDescription && d.shortDescription.toLowerCase().includes(keyword)) ||
       d.tags.some(tag => tag.toLowerCase().includes(keyword)) ||
       d.category.toLowerCase().includes(keyword)
     );
