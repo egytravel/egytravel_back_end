@@ -203,7 +203,7 @@ exports.searchDestinations = async (req, res) => {
 
     const keyword = q.toLowerCase().trim();
 
-    const results = destinations.filter(d =>
+    let results = destinations.filter(d =>
       d.name.toLowerCase().includes(keyword) ||
       d.city.toLowerCase().includes(keyword) ||
       d.location.toLowerCase().includes(keyword) ||
@@ -211,11 +211,21 @@ exports.searchDestinations = async (req, res) => {
       d.category.toLowerCase().includes(keyword)
     );
 
-    res.json({
-      success: true,
-      count: results.length,
-      data: results
-    });
+    // Enrich with Google photos
+    if (process.env.GOOGLE_PLACES_API_KEY) {
+      results = await Promise.all(
+        results.map(async (d) => {
+          const googleData = await getReviewsForDestination(
+            d.id, d.googleSearchName || d.name, d.lat, d.lng
+          ).catch(() => null);
+          if (!googleData?.photos?.length) return d;
+          const urls = googleData.photos.map(p => p.url);
+          return { ...d, images: urls, coverImage: urls[0] };
+        })
+      );
+    }
+
+    res.json({ success: true, count: results.length, data: results });
   } catch (error) {
     logger.error('Search destinations error', { error: error.message });
     res.status(500).json({
@@ -238,6 +248,19 @@ exports.getMapMarkers = async (req, res) => {
     if (category) results = results.filter(d => d.category === category);
     if (city) results = results.filter(d => d.city.toLowerCase() === city.toLowerCase());
 
+    // Enrich with Google photos for map pins
+    if (process.env.GOOGLE_PLACES_API_KEY) {
+      results = await Promise.all(
+        results.map(async (d) => {
+          const googleData = await getReviewsForDestination(
+            d.id, d.googleSearchName || d.name, d.lat, d.lng
+          ).catch(() => null);
+          if (!googleData?.photos?.length) return d;
+          return { ...d, coverImage: googleData.photos[0].url };
+        })
+      );
+    }
+
     const markers = results.map(d => ({
       id: d.id,
       name: d.name,
@@ -252,11 +275,7 @@ exports.getMapMarkers = async (req, res) => {
       currency: d.currency
     }));
 
-    res.json({
-      success: true,
-      count: markers.length,
-      data: markers
-    });
+    res.json({ success: true, count: markers.length, data: markers });
   } catch (error) {
     logger.error('Get map markers error', { error: error.message });
     res.status(500).json({
