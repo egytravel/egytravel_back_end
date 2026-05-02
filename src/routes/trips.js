@@ -20,4 +20,8 @@ router.get('/:tripId/days/:dayId', tripDayController.getDay);
 router.put('/:tripId/days/:dayId', tripDayController.updateDay);
 router.delete('/:tripId/days/:dayId', tripDayController.deleteDay);
 
+// ─── Trip Map ─────────────────────────────────────────────────────────────────
+// GET /api/trips/:tripId/map — all locations across all days as map markers
+router.get('/:tripId/map', tripDayController.getTripMapMarkers);
+
 module.exports = router;

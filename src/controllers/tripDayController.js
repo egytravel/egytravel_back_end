@@ -161,9 +161,63 @@ exports.updateDay = async (req, res) => {
 };
 
 /**
- * DELETE /api/trips/:tripId/days/:dayId
- * Delete a day from a trip
+ * GET /api/trips/:tripId/map
+ * Returns all locations across all days as map markers
+ * Used to show the full trip route on a map
  */
+exports.getTripMapMarkers = async (req, res) => {
+  try {
+    const userId = req.user.user_id;
+    const { tripId } = req.params;
+
+    const trip = await findUserTrip(tripId, userId);
+    if (!trip) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Trip not found' } });
+    }
+
+    const days = await TripDay.findAll({
+      where: { trip_id: tripId },
+      order: [['day_number', 'ASC']]
+    });
+
+    // Flatten all locations from all days into a single markers array
+    const markers = [];
+    for (const day of days) {
+      const locations = day.locations || [];
+      for (const loc of locations) {
+        if (loc.lat && loc.lng) {
+          markers.push({
+            dayNumber: day.day_number,
+            dayTitle: day.title,
+            date: day.date,
+            name: loc.name,
+            lat: loc.lat,
+            lng: loc.lng
+          });
+        }
+      }
+    }
+
+    // Compute a suggested map center based on all markers
+    let mapCenter = null;
+    if (markers.length > 0) {
+      const avgLat = markers.reduce((sum, m) => sum + m.lat, 0) / markers.length;
+      const avgLng = markers.reduce((sum, m) => sum + m.lng, 0) / markers.length;
+      mapCenter = { lat: avgLat, lng: avgLng };
+    }
+
+    res.json({
+      success: true,
+      tripId: parseInt(tripId),
+      totalMarkers: markers.length,
+      mapCenter,
+      markers
+    });
+  } catch (error) {
+    logger.error('Get trip map markers error', { error: error.message });
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to get trip map data' } });
+  }
+};
 exports.deleteDay = async (req, res) => {
   try {
     const userId = req.user.user_id;
