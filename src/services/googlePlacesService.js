@@ -118,4 +118,131 @@ async function getReviewsForDestination(destinationId, destinationName, lat, lng
   return await getPlaceDetails(placeId);
 }
 
-module.exports = { getReviewsForDestination, getPlaceDetails, findPlaceId };
+/**
+ * Search for restaurants near a city using Google Places Text Search
+ * @param {string} city - City name
+ * @param {string} cuisine - Optional cuisine type filter
+ * @param {number} lat - City center latitude
+ * @param {number} lng - City center longitude
+ * @param {number} limit - Max results (default 10)
+ */
+async function searchRestaurants(city, cuisine = null, lat, lng, limit = 10) {
+  if (!API_KEY) return null;
+
+  const query = cuisine
+    ? `${cuisine} restaurant in ${city} Egypt`
+    : `best restaurant in ${city} Egypt`;
+
+  const cacheKey = `restaurants_${city}_${cuisine || 'all'}_${limit}`;
+  const cached = cacheService.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await axios.get(`${BASE_URL}/textsearch/json`, {
+      params: {
+        query,
+        type: 'restaurant',
+        key: API_KEY,
+        language: 'en'
+      },
+      timeout: 10000
+    });
+
+    if (response.data.status !== 'OK' && response.data.status !== 'ZERO_RESULTS') {
+      logger.warn('Google Places restaurant search failed', { status: response.data.status, query });
+      return null;
+    }
+
+    const results = (response.data.results || []).slice(0, limit).map(r => ({
+      id: r.place_id,
+      googlePlaceId: r.place_id,
+      title: r.name,
+      name: r.name,
+      location: r.formatted_address || city,
+      city,
+      rating: r.rating || 0,
+      priceLevel: r.price_level || null,
+      priceDisplay: r.price_level ? '$'.repeat(r.price_level) : '$',
+      coverImage: r.photos?.[0]
+        ? `${process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com'}/api/places/photo?ref=${r.photos[0].photo_reference}`
+        : null,
+      lat: r.geometry?.location?.lat || lat,
+      lng: r.geometry?.location?.lng || lng,
+      isOpen: r.opening_hours?.open_now ?? null,
+      types: r.types || []
+    }));
+
+    cacheService.set(cacheKey, results, 3600); // cache 1 hour
+    return results;
+  } catch (error) {
+    logger.error('Google Places restaurant search failed', { query, error: error.message });
+    return null;
+  }
+}
+
+/**
+ * Get restaurant details including photos and reviews
+ * @param {string} placeId - Google Place ID
+ */
+async function getRestaurantDetails(placeId) {
+  if (!API_KEY) return null;
+
+  const cacheKey = `restaurant_detail_${placeId}`;
+  const cached = cacheService.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await axios.get(`${BASE_URL}/details/json`, {
+      params: {
+        place_id: placeId,
+        fields: 'name,rating,reviews,photos,formatted_address,opening_hours,geometry,formatted_phone_number,website,price_level',
+        key: API_KEY,
+        language: 'en'
+      },
+      timeout: 10000
+    });
+
+    if (response.data.status !== 'OK') return null;
+
+    const r = response.data.result;
+    const BASE = process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com';
+
+    const result = {
+      googlePlaceId: placeId,
+      title: r.name,
+      name: r.name,
+      address: r.formatted_address || '',
+      location: r.formatted_address || '',
+      rating: r.rating || 0,
+      priceLevel: r.price_level || null,
+      priceDisplay: r.price_level ? '$'.repeat(r.price_level) : '$',
+      phone: r.formatted_phone_number || null,
+      website: r.website || null,
+      openingHours: r.opening_hours?.weekday_text || [],
+      isOpen: r.opening_hours?.open_now ?? null,
+      lat: r.geometry?.location?.lat || null,
+      lng: r.geometry?.location?.lng || null,
+      mapLocation: r.geometry?.location || null,
+      images: (r.photos || []).slice(0, 5).map(p => `${BASE}/api/places/photo?ref=${p.photo_reference}`),
+      coverImage: r.photos?.[0] ? `${BASE}/api/places/photo?ref=${r.photos[0].photo_reference}` : null,
+      reviews: (r.reviews || []).map(rev => ({
+        id: `google_${rev.time}`,
+        source: 'google',
+        authorName: rev.author_name,
+        authorAvatar: rev.profile_photo_url || null,
+        rating: rev.rating,
+        text: rev.text,
+        time: rev.relative_time_description,
+        timestamp: new Date(rev.time * 1000).toISOString()
+      }))
+    };
+
+    cacheService.set(cacheKey, result, 21600); // cache 6 hours
+    return result;
+  } catch (error) {
+    logger.error('Google Places getRestaurantDetails failed', { placeId, error: error.message });
+    return null;
+  }
+}
+
+module.exports = { getReviewsForDestination, getPlaceDetails, findPlaceId, searchRestaurants, getRestaurantDetails };

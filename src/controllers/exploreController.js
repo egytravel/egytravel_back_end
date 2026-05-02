@@ -1,9 +1,9 @@
-const { places: staticPlaces, restaurants, curatedHotels, popularFlightRoutes } = require('../data/exploreData');
+const { places: staticPlaces, restaurants: staticRestaurants, curatedHotels, popularFlightRoutes } = require('../data/exploreData');
 const openTripMapService = require('../services/openTripMapService');
 const bookingHotelService = require('../services/bookingComRapidService');
 const bookingFlightService = require('../services/bookingComFlightService');
 const { getWikipediaSummary } = require('../services/wikipediaService');
-const { getReviewsForDestination } = require('../services/googlePlacesService');
+const { getReviewsForDestination, searchRestaurants, getRestaurantDetails } = require('../services/googlePlacesService');
 const logger = require('../utils/logger');
 
 // Default search params for explore screen (today + 2 days)
@@ -197,18 +197,48 @@ exports.getPlaceById = async (req, res) => {
 };
 
 /**
- * GET /api/explore/restaurants?city=Cairo&category=Egyptian
+ * GET /api/explore/restaurants?city=Cairo&cuisine=Egyptian&limit=10
+ * Real restaurants from Google Places API, falls back to static
  */
 exports.getRestaurants = async (req, res) => {
   try {
-    const { city, category, limit } = req.query;
-    const limitNum = parseInt(limit) || 20;
+    const { city = 'Cairo', cuisine, limit } = req.query;
+    const limitNum = Math.min(parseInt(limit) || 10, 20);
 
-    let results = [...restaurants];
+    // City center coordinates for location bias
+    const cityCenters = {
+      cairo: { lat: 30.0444, lng: 31.2357 },
+      luxor: { lat: 25.6872, lng: 32.6396 },
+      aswan: { lat: 24.0889, lng: 32.8998 },
+      alexandria: { lat: 31.2001, lng: 29.9187 },
+      'sharm-el-sheikh': { lat: 27.9158, lng: 34.3300 },
+      hurghada: { lat: 27.2579, lng: 33.8116 },
+      dahab: { lat: 28.4912, lng: 34.5131 }
+    };
+
+    const center = cityCenters[city.toLowerCase()] || cityCenters.cairo;
+
+    // Try Google Places first
+    if (process.env.GOOGLE_PLACES_API_KEY) {
+      const results = await searchRestaurants(city, cuisine || null, center.lat, center.lng, limitNum);
+      if (results && results.length > 0) {
+        return res.json({
+          success: true,
+          source: 'google',
+          city,
+          cuisine: cuisine || 'all',
+          count: results.length,
+          data: results
+        });
+      }
+    }
+
+    // Fallback to static data
+    let results = [...staticRestaurants];
     if (city) results = results.filter(r => r.city.toLowerCase() === city.toLowerCase());
-    if (category) results = results.filter(r => r.category === category);
+    if (cuisine) results = results.filter(r => r.category === cuisine);
 
-    res.json({ success: true, count: results.slice(0, limitNum).length, data: results.slice(0, limitNum) });
+    res.json({ success: true, source: 'static', count: results.slice(0, limitNum).length, data: results.slice(0, limitNum) });
   } catch (error) {
     logger.error('Get restaurants error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load restaurants' } });
@@ -217,14 +247,26 @@ exports.getRestaurants = async (req, res) => {
 
 /**
  * GET /api/explore/restaurants/:id
+ * Get restaurant details — id can be a Google Place ID or static id
  */
 exports.getRestaurantById = async (req, res) => {
   try {
-    const restaurant = restaurants.find(r => r.id === req.params.id);
+    const { id } = req.params;
+
+    // Try Google Places details (id is a Google Place ID)
+    if (process.env.GOOGLE_PLACES_API_KEY && id.startsWith('ChIJ')) {
+      const details = await getRestaurantDetails(id);
+      if (details) {
+        return res.json({ success: true, source: 'google', data: details });
+      }
+    }
+
+    // Fallback to static data
+    const restaurant = staticRestaurants.find(r => r.id === id);
     if (!restaurant) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Restaurant not found' } });
     }
-    res.json({ success: true, data: restaurant });
+    res.json({ success: true, source: 'static', data: restaurant });
   } catch (error) {
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load restaurant' } });
   }
