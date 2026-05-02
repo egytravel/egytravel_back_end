@@ -60,11 +60,19 @@ exports.createPost = async (req, res) => {
   }
 };
 
+// Helper to validate MongoDB ObjectId
+function isValidObjectId(id) {
+  return /^[0-9a-fA-F]{24}$/.test(id);
+}
+
 /**
  * GET /api/community/posts/:postId
  */
 exports.getPost = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.postId)) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_POST_ID', message: 'Invalid post ID. Use the postId from the feed response.' } });
+    }
     const post = await Post.findById(req.params.postId).lean();
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
@@ -82,6 +90,9 @@ exports.getPost = async (req, res) => {
  */
 exports.deletePost = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.postId)) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_POST_ID', message: 'Invalid post ID. Use the postId from the feed response.' } });
+    }
     const isAdmin = req.user.role === 'admin';
     const query = isAdmin
       ? { _id: req.params.postId }
@@ -106,6 +117,9 @@ exports.deletePost = async (req, res) => {
 exports.toggleLike = async (req, res) => {
   try {
     const userId = req.user.user_id;
+    if (!isValidObjectId(req.params.postId)) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_POST_ID', message: 'Invalid post ID. Use the postId from the feed response.' } });
+    }
     const post = await Post.findById(req.params.postId);
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
@@ -136,6 +150,11 @@ exports.addComment = async (req, res) => {
     const { comment } = req.body;
     if (!comment?.trim()) {
       return res.status(400).json({ success: false, error: { code: 'MISSING_REQUIRED_PARAMS', message: 'Comment is required' } });
+    }
+
+    // Validate MongoDB ObjectId format
+    if (!req.params.postId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_POST_ID', message: 'Invalid post ID format. Use the postId from the feed response.' } });
     }
 
     const post = await Post.findById(req.params.postId);
