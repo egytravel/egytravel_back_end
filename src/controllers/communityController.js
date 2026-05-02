@@ -78,14 +78,21 @@ exports.getPost = async (req, res) => {
 
 /**
  * DELETE /api/community/posts/:postId
+ * Users can delete their own posts. Admins can delete any post.
  */
 exports.deletePost = async (req, res) => {
   try {
-    const post = await Post.findOne({ _id: req.params.postId, userId: req.user.user_id });
+    const isAdmin = req.user.role === 'admin';
+    const query = isAdmin
+      ? { _id: req.params.postId }
+      : { _id: req.params.postId, userId: req.user.user_id };
+
+    const post = await Post.findOne(query);
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
     }
     await post.deleteOne();
+    logger.info('Post deleted', { postId: req.params.postId, deletedBy: req.user.user_id, isAdmin });
     res.json({ success: true, message: 'Post deleted successfully' });
   } catch (error) {
     logger.error('Delete post error', { error: error.message });
@@ -164,23 +171,30 @@ exports.addComment = async (req, res) => {
 
 /**
  * DELETE /api/community/posts/:postId/comments/:commentId
+ * Users can delete their own comments. Admins can delete any comment.
  */
 exports.deleteComment = async (req, res) => {
   try {
+    const isAdmin = req.user.role === 'admin';
     const post = await Post.findById(req.params.postId);
     if (!post) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Post not found' } });
     }
 
     const comment = post.comments.id(req.params.commentId);
-    if (!comment || comment.userId !== req.user.user_id) {
+    if (!comment) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Comment not found' } });
+    }
+
+    if (!isAdmin && comment.userId !== req.user.user_id) {
+      return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'You can only delete your own comments' } });
     }
 
     comment.deleteOne();
     post.commentsCount = Math.max(0, post.commentsCount - 1);
     await post.save();
 
+    logger.info('Comment deleted', { commentId: req.params.commentId, deletedBy: req.user.user_id, isAdmin });
     res.json({ success: true, message: 'Comment deleted successfully' });
   } catch (error) {
     logger.error('Delete comment error', { error: error.message });

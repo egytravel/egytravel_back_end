@@ -40,6 +40,12 @@ const User = sequelize.define('User', {
     allowNull: true,
     defaultValue: 'user'
   },
+  is_verified: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'is_verified'   // maps to is_verified column (added via migration)
+  },
   phone: { type: DataTypes.STRING(30), allowNull: true },
   nationality: { type: DataTypes.STRING(100), allowNull: true },
   date_of_birth: { type: DataTypes.DATEONLY, allowNull: true },

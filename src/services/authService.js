@@ -61,6 +61,13 @@ class AuthService {
         throw new Error('Invalid email or password');
       }
 
+      // Block login if email not verified
+      if (!user.is_verified) {
+        const error = new Error('Email not verified. Please check your email for the verification code.');
+        error.code = 'EMAIL_NOT_VERIFIED';
+        throw error;
+      }
+
       // Generate tokens
       const tokens = JWTService.generateTokenPair(user);
 

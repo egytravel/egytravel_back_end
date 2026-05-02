@@ -22,7 +22,7 @@ router.get('/users/:userId/posts', communityController.getUserPosts);
 // POST /api/community/posts — create post (auth required)
 router.post('/posts', authenticateToken, postLimiter, communityController.createPost);
 
-// DELETE /api/community/posts/:postId — delete own post
+// DELETE /api/community/posts/:postId — delete own post OR admin can delete any post
 router.delete('/posts/:postId', authenticateToken, communityController.deletePost);
 
 // POST /api/community/posts/:postId/like — toggle like

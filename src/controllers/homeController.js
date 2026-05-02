@@ -1,6 +1,7 @@
 const { destinations, cities } = require('../data/destinations');
 const logger = require('../utils/logger');
 const { enrichWithWikipedia } = require('../services/wikipediaService');
+const { getReviewsForDestination } = require('../services/googlePlacesService');
 
 /**
  * GET /api/home
@@ -11,12 +12,25 @@ exports.getHomeData = async (req, res) => {
     const featured = destinations.filter(d => d.featured);
     const popular = destinations.filter(d => d.popular);
 
+    // Enrich featured destinations with Google photos for the hero slider
+    const enrichFeatured = await Promise.all(
+      featured.map(async (d) => {
+        if (!process.env.GOOGLE_PLACES_API_KEY) return d;
+        const googleData = await getReviewsForDestination(
+          d.id, d.googleSearchName || d.name, d.lat, d.lng
+        ).catch(() => null);
+        if (!googleData?.photos?.length) return d;
+        const urls = googleData.photos.map(p => p.url);
+        return { ...d, images: urls, coverImage: urls[0] };
+      })
+    );
+
     res.json({
       success: true,
       data: {
-        featured,        // Hero slider cards
-        popular,         // Popular Places section
-        destinations: cities  // Destination city cards
+        featured: enrichFeatured,
+        popular,
+        destinations: cities
       }
     });
   } catch (error) {
@@ -73,8 +87,44 @@ exports.getDestinationById = async (req, res) => {
       });
     }
 
-    // Enrich with Wikipedia for richer descriptions and images
+    // Enrich with Wikipedia — for description text only
     const enriched = await enrichWithWikipedia(destination);
+
+    // Enrich with Google Places — real photos, reviews, rating, opening hours
+    // Use googleSearchName if defined (overrides name for better Google match)
+    let googleData = null;
+    if (process.env.GOOGLE_PLACES_API_KEY) {
+      const searchName = destination.googleSearchName || destination.name;
+      googleData = await getReviewsForDestination(
+        destination.id,
+        searchName,
+        destination.lat,
+        destination.lng
+      );
+    }
+
+    // Google photos replace static images (more specific and real)
+    if (googleData?.photos?.length) {
+      const googlePhotoUrls = googleData.photos.map(p => p.url);
+      enriched.images = googlePhotoUrls;
+      enriched.coverImage = googlePhotoUrls[0];
+    }
+
+    // Attach Google reviews, rating, opening hours, and precise map location
+    if (googleData) {
+      enriched.googleRating = googleData.rating;
+      enriched.googleReviews = googleData.reviews;
+      enriched.address = googleData.address || enriched.address;
+      if (googleData.location) {
+        // Use Google's precise coordinates for the map pin
+        enriched.lat = googleData.location.lat;
+        enriched.lng = googleData.location.lng;
+        enriched.mapLocation = googleData.location;
+      }
+      if (googleData.openingHours?.length) {
+        enriched.openingHours = googleData.openingHours;
+      }
+    }
 
     res.json({
       success: true,
@@ -91,15 +141,21 @@ exports.getDestinationById = async (req, res) => {
 
 /**
  * GET /api/home/cities
- * Returns all city cards
+ * Returns all city cards enriched with Google photos
  */
 exports.getCities = async (req, res) => {
   try {
-    res.json({
-      success: true,
-      count: cities.length,
-      data: cities
-    });
+    const enriched = await Promise.all(
+      cities.map(async (city) => {
+        if (!process.env.GOOGLE_PLACES_API_KEY) return city;
+        const googleData = await getReviewsForDestination(
+          city.id, city.googleSearchName || city.name, city.lat, city.lng
+        ).catch(() => null);
+        if (!googleData?.photos?.length) return city;
+        return { ...city, coverImage: googleData.photos[0].url };
+      })
+    );
+    res.json({ success: true, count: enriched.length, data: enriched });
   } catch (error) {
     logger.error('Get cities error', { error: error.message });
     res.status(500).json({

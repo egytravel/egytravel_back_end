@@ -1,12 +1,13 @@
 /**
  * Curated Egyptian destinations data
- * Used for homescreen featured slider, popular places, destination cards, and map view
+ * Images come from Google Places API at runtime — no static images here.
  */
 
 const destinations = [
   {
     id: 'giza-plateau',
     name: 'The Great Sphinx',
+    googleSearchName: 'Pyramids of Giza',
     location: 'Giza Plateau',
     city: 'Cairo',
     cityCode: 'CAI',
@@ -15,12 +16,8 @@ const destinations = [
     lng: 31.1376,
     description: 'The Great Sphinx of Giza is a limestone statue of a reclining sphinx, a mythical creature with a human head and a lion\'s body. It is the oldest known monumental sculpture in Egypt and is commonly believed to have been built by ancient Egyptians of the Old Kingdom during the reign of the pharaoh Khafre (c. 2558–2532 BC).',
     shortDescription: 'The iconic ancient limestone sphinx guarding the Giza pyramids, one of Egypt\'s most recognizable monuments.',
-    images: [
-      'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
-      'https://images.unsplash.com/photo-1568322445389-f64ac2515020?w=800',
-      'https://images.unsplash.com/photo-1572252009286-268acec5ca0a?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.9,
     reviewCount: 15420,
     pricePerPerson: 25,
@@ -45,12 +42,8 @@ const destinations = [
     lng: 32.6014,
     description: 'The Valley of the Kings is a valley in Egypt where, for a period of nearly 500 years from the 16th to 11th century BC, rock-cut tombs were excavated for the pharaohs and powerful nobles of the New Kingdom of ancient Egypt.',
     shortDescription: 'Ancient royal burial ground with elaborately decorated tombs of pharaohs including Tutankhamun.',
-    images: [
-      'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800',
-      'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
-      'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.8,
     reviewCount: 12300,
     pricePerPerson: 300,
@@ -75,12 +68,8 @@ const destinations = [
     lng: 31.6258,
     description: 'Abu Simbel is an archaeological site comprising two massive rock-cut temples in the village of Abu Simbel in Aswan Governorate, Upper Egypt. The twin temples were originally carved out of the mountainside in the 13th century BC, during the 19th Dynasty reign of the Pharaoh Ramesses II.',
     shortDescription: 'Magnificent twin temples carved into the mountainside by Ramesses II, relocated to save them from the Nile flood.',
-    images: [
-      'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
-      'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
-      'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.6,
     reviewCount: 8900,
     pricePerPerson: 420,
@@ -105,12 +94,8 @@ const destinations = [
     lng: 32.6573,
     description: 'The Karnak Temple Complex comprises a vast mix of decayed temples, chapels, pylons, and other buildings near Luxor, Egypt. Construction at the complex began during the reign of Senusret I in the Middle Kingdom and continued into the Ptolemaic period.',
     shortDescription: 'The largest ancient religious site in the world, a vast complex of temples dedicated to the Theban triad.',
-    images: [
-      'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
-      'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800',
-      'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.7,
     reviewCount: 11200,
     pricePerPerson: 180,
@@ -135,12 +120,8 @@ const destinations = [
     lng: 28.0833,
     description: 'The White Desert National Park is a national park in Egypt, first established as a protected area in 2002. It is located in the Farafra depression, 45 km north of the town of Qasr el-Farafra. The park is known for its white chalk rock formations.',
     shortDescription: 'Surreal white chalk rock formations in the Sahara, creating an otherworldly moonscape landscape.',
-    images: [
-      'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
-      'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
-      'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.7,
     reviewCount: 5600,
     pricePerPerson: 150,
@@ -165,12 +146,8 @@ const destinations = [
     lng: 34.3300,
     description: 'Sharm El Sheikh is a city on the southern tip of the Sinai Peninsula in Egypt. It is a major tourist destination and a significant center for diving and snorkeling in the Red Sea.',
     shortDescription: 'World-class diving and snorkeling destination on the Red Sea with stunning coral reefs and luxury resorts.',
-    images: [
-      'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-      'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
-      'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.5,
     reviewCount: 18700,
     pricePerPerson: 200,
@@ -195,12 +172,8 @@ const destinations = [
     lng: 33.8116,
     description: 'Hurghada is a large Red Sea resort town in Egypt. Once a small fishing village, it has grown to become one of Egypt\'s most popular tourist destinations.',
     shortDescription: 'Vibrant Red Sea resort city with beautiful beaches, water sports, and excellent diving opportunities.',
-    images: [
-      'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
-      'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-      'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.4,
     reviewCount: 14200,
     pricePerPerson: 180,
@@ -225,12 +198,8 @@ const destinations = [
     lng: 29.9187,
     description: 'Alexandria is the second-largest city in Egypt and a major economic centre. Founded by Alexander the Great in 331 BC, it was the capital of Ptolemaic Egypt and was once home to the famous Library of Alexandria.',
     shortDescription: 'Historic Mediterranean city founded by Alexander the Great, blending ancient history with modern culture.',
-    images: [
-      'https://images.unsplash.com/photo-1572252009286-268acec5ca0a?w=800',
-      'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
-      'https://images.unsplash.com/photo-1568322445389-f64ac2515020?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1572252009286-268acec5ca0a?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.3,
     reviewCount: 9800,
     pricePerPerson: 120,
@@ -255,12 +224,8 @@ const destinations = [
     lng: 25.5195,
     description: 'Siwa Oasis is an urban oasis in Egypt between the Qattara Depression and the Egyptian Sand Sea in the Libyan Desert, nearly 50 km east of the Libyan border. It is one of Egypt\'s most isolated settlements with a unique Berber culture.',
     shortDescription: 'Remote desert oasis with ancient ruins, salt lakes, and unique Berber culture far from the tourist trail.',
-    images: [
-      'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
-      'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
-      'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.6,
     reviewCount: 4200,
     pricePerPerson: 130,
@@ -285,12 +250,8 @@ const destinations = [
     lng: 34.5131,
     description: 'Dahab is a small town on the southeast coast of the Sinai Peninsula in Egypt. Once a Bedouin fishing village, it has become a popular tourist destination, particularly for budget travelers and divers. The Blue Hole, a famous diving site, is located nearby.',
     shortDescription: 'Laid-back Sinai beach town famous for the Blue Hole dive site and windsurfing on the Red Sea.',
-    images: [
-      'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-      'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
-      'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=800'
-    ],
-    coverImage: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
+    images: [],
+    coverImage: null,
     rating: 4.5,
     reviewCount: 7300,
     pricePerPerson: 90,
@@ -306,16 +267,17 @@ const destinations = [
   }
 ];
 
-// City/destination cards for the "Destination" section
+// City cards — images come from Google Places at runtime
 const cities = [
   {
     id: 'cairo',
     name: 'Cairo',
+    googleSearchName: 'Cairo Egypt city',
     cityCode: 'CAI',
     country: 'Egypt',
     lat: 30.0444,
     lng: 31.2357,
-    coverImage: 'https://images.unsplash.com/photo-1539650116574-75c0c6d73f6e?w=800',
+    coverImage: null,
     description: 'The capital of Egypt, home to the Pyramids of Giza and the Egyptian Museum.',
     attractionsCount: 45,
     rating: 4.7
@@ -323,11 +285,12 @@ const cities = [
   {
     id: 'luxor',
     name: 'Luxor',
+    googleSearchName: 'Luxor Egypt temples',
     cityCode: 'LXR',
     country: 'Egypt',
     lat: 25.6872,
     lng: 32.6396,
-    coverImage: 'https://images.unsplash.com/photo-1553913861-c0fddf2619ee?w=800',
+    coverImage: null,
     description: 'The world\'s greatest open-air museum, home to Karnak Temple and Valley of the Kings.',
     attractionsCount: 32,
     rating: 4.8
@@ -335,11 +298,12 @@ const cities = [
   {
     id: 'aswan',
     name: 'Aswan',
+    googleSearchName: 'Aswan Egypt Nile',
     cityCode: 'ASW',
     country: 'Egypt',
     lat: 24.0889,
     lng: 32.8998,
-    coverImage: 'https://images.unsplash.com/photo-1601581875309-fafbf2d3ed3a?w=800',
+    coverImage: null,
     description: 'A serene Nile city with Nubian culture, Abu Simbel temples, and Philae Island.',
     attractionsCount: 18,
     rating: 4.6
@@ -351,7 +315,7 @@ const cities = [
     country: 'Egypt',
     lat: 27.9158,
     lng: 34.3300,
-    coverImage: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
+    coverImage: null,
     description: 'Premier Red Sea resort with world-class diving and stunning coral reefs.',
     attractionsCount: 22,
     rating: 4.5
@@ -363,7 +327,7 @@ const cities = [
     country: 'Egypt',
     lat: 27.2579,
     lng: 33.8116,
-    coverImage: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
+    coverImage: null,
     description: 'Vibrant beach resort on the Red Sea coast with excellent water sports.',
     attractionsCount: 19,
     rating: 4.4
@@ -371,11 +335,12 @@ const cities = [
   {
     id: 'alexandria',
     name: 'Alexandria',
+    googleSearchName: 'Alexandria Egypt Mediterranean',
     cityCode: 'ALY',
     country: 'Egypt',
     lat: 31.2001,
     lng: 29.9187,
-    coverImage: 'https://images.unsplash.com/photo-1572252009286-268acec5ca0a?w=800',
+    coverImage: null,
     description: 'Historic Mediterranean city blending ancient history with modern culture.',
     attractionsCount: 28,
     rating: 4.3

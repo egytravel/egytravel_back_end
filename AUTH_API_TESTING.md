@@ -8,116 +8,221 @@
 
 ---
 
+## 🔄 Auth Flow Overview
+
+The registration flow now requires email verification before login is allowed:
+
+```
+Register → Receive OTP email → Verify OTP → Get JWT token → Login freely
+```
+
+If you try to login before verifying your email, you'll get a `403 EMAIL NOT VERIFIED` response.
+
+---
+
 ## 📋 Authentication Endpoints
 
-### **1. User Registration**
+### **1. Register**
 
 ```http
 POST http://localhost:3000/api/auth/register
 Content-Type: application/json
 
 {
-  "email": "tourist@example.com",
-  "password": "Test123456",
-  "firstName": "Ahmed",
-  "lastName": "Hassan"
+  "name": "Ahmed Hassan",
+  "email": "ahmed@example.com",
+  "password": "Test@1234"
 }
 ```
 
 **Response (201 Created):**
 ```json
 {
-  "success": true,
-  "message": "User registered successfully",
+  "code": 201,
+  "message": "REGISTRATION SUCCESSFUL",
   "data": {
-    "user": {
-      "id": 1,
-      "email": "tourist@example.com",
-      "firstName": "Ahmed",
-      "lastName": "Hassan",
-      "role": "tourist"
-    },
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    "user_id": 1,
+    "name": "Ahmed Hassan",
+    "email": "ahmed@example.com",
+    "role": "user",
+    "emailVerified": false,
+    "message": "A verification code has been sent to your email. Please verify before logging in."
+  }
+}
+```
+
+> ⚠️ No token is returned here. Check your email for the 6-digit OTP.
+
+---
+
+### **2. Verify Email (OTP)**
+
+```http
+POST http://localhost:3000/api/auth/verify-email
+Content-Type: application/json
+
+{
+  "email": "ahmed@example.com",
+  "otp": "482910"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Email verified successfully! Welcome to EgyTravel.",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user_id": 1,
+    "name": "Ahmed Hassan",
+    "email": "ahmed@example.com",
+    "role": "user",
+    "emailVerified": true
+  }
+}
+```
+
+> ✅ Save the `token` — this is your JWT for authenticated requests.
+
+**Error — Wrong OTP (400):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_OTP",
+    "message": "Incorrect verification code"
+  }
+}
+```
+
+**Error — Expired OTP (400):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "OTP_EXPIRED",
+    "message": "OTP has expired. Please request a new one."
   }
 }
 ```
 
 ---
 
-### **2. User Login**
+### **3. Resend OTP**
+
+Use this if the OTP expired or was never received.
+
+```http
+POST http://localhost:3000/api/auth/resend-otp
+Content-Type: application/json
+
+{
+  "email": "ahmed@example.com"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Verification code resent to your email"
+}
+```
+
+---
+
+### **4. Login**
+
+Only works after email is verified.
 
 ```http
 POST http://localhost:3000/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "tourist@example.com",
-  "password": "Test123456"
+  "email": "ahmed@example.com",
+  "password": "Test@1234"
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
+  "code": 200,
+  "message": "LOGIN SUCCESSFUL",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user_id": 1,
+    "name": "Ahmed Hassan",
+    "email": "ahmed@example.com",
+    "role": "user"
+  }
+}
+```
+
+**Error — Email not verified (403):**
+```json
+{
+  "code": 403,
+  "message": "EMAIL NOT VERIFIED",
+  "data": {
+    "email": "ahmed@example.com",
+    "message": "Email not verified. Please check your email for the verification code."
+  }
+}
+```
+
+**Error — Wrong credentials (401):**
+```json
+{
+  "code": 401,
+  "message": "INVALID CREDENTIALS",
+  "data": null
+}
+```
+
+---
+
+### **5. Get Current User**
+
+```http
+GET http://localhost:3000/api/auth/me
+Authorization: Bearer YOUR_TOKEN
+```
+
+**Response (200 OK):**
+```json
+{
   "success": true,
-  "message": "Login successful",
   "data": {
     "user": {
-      "id": 1,
-      "email": "tourist@example.com",
-      "firstName": "Ahmed",
-      "lastName": "Hassan",
-      "role": "tourist"
-    },
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      "user_id": 1,
+      "name": "Ahmed Hassan",
+      "email": "ahmed@example.com",
+      "role": "user",
+      "is_verified": true,
+      "phone": null,
+      "nationality": null,
+      "date_of_birth": null,
+      "profile_photo_url": null
+    }
   }
 }
 ```
 
 ---
 
-### **3. Get User Profile**
+### **6. Forgot Password**
+
+Sends a 6-digit reset code to the email.
 
 ```http
-GET http://localhost:3000/api/users/profile
-Authorization: Bearer YOUR_ACCESS_TOKEN
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "data": {
-    "id": 1,
-    "email": "tourist@example.com",
-    "firstName": "Ahmed",
-    "lastName": "Hassan",
-    "role": "tourist",
-    "phone": null,
-    "dateOfBirth": null,
-    "nationality": null,
-    "createdAt": "2025-11-23T20:00:00.000Z"
-  }
-}
-```
-
----
-
-### **4. Update User Profile**
-
-```http
-PUT http://localhost:3000/api/users/profile
-Authorization: Bearer YOUR_ACCESS_TOKEN
+POST http://localhost:3000/api/auth/forgot-password
 Content-Type: application/json
 
 {
-  "firstName": "Ahmed",
-  "lastName": "Hassan",
-  "phone": "+201234567890",
-  "dateOfBirth": "1990-01-15",
-  "nationality": "Egyptian"
+  "email": "ahmed@example.com"
 }
 ```
 
@@ -125,23 +230,36 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "message": "Profile updated successfully",
-  "data": {
-    "id": 1,
-    "email": "tourist@example.com",
-    "firstName": "Ahmed",
-    "lastName": "Hassan",
-    "phone": "+201234567890",
-    "dateOfBirth": "1990-01-15",
-    "nationality": "Egyptian",
-    "role": "tourist"
-  }
+  "message": "If this email exists, a reset code has been sent"
 }
 ```
 
 ---
 
-### **5. Refresh Token**
+### **7. Reset Password**
+
+```http
+POST http://localhost:3000/api/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "ahmed@example.com",
+  "otp": "739201",
+  "newPassword": "NewPass@5678"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Password reset successfully. You can now log in."
+}
+```
+
+---
+
+### **8. Refresh Token**
 
 ```http
 POST http://localhost:3000/api/auth/refresh
@@ -157,19 +275,18 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
 }
 ```
 
 ---
 
-### **6. Logout**
+### **9. Logout**
 
 ```http
 POST http://localhost:3000/api/auth/logout
-Authorization: Bearer YOUR_ACCESS_TOKEN
+Authorization: Bearer YOUR_TOKEN
 ```
 
 **Response (200 OK):**
@@ -182,346 +299,131 @@ Authorization: Bearer YOUR_ACCESS_TOKEN
 
 ---
 
-### **7. Forgot Password (Request Reset)**
-
-```http
-POST http://localhost:3000/api/auth/forgot-password
-Content-Type: application/json
-
-{
-  "email": "tourist@example.com"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Password reset instructions sent to email"
-}
-```
-
----
-
-### **8. Reset Password**
-
-```http
-POST http://localhost:3000/api/auth/reset-password
-Content-Type: application/json
-
-{
-  "token": "RESET_TOKEN_FROM_EMAIL",
-  "newPassword": "NewPassword123"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Password reset successfully"
-}
-```
-
----
-
-## 👨‍💼 Admin Endpoints
-
-### **9. Get All Users (Admin Only)**
-
-```http
-GET http://localhost:3000/api/users/admin/users
-Authorization: Bearer ADMIN_ACCESS_TOKEN
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "email": "tourist@example.com",
-      "firstName": "Ahmed",
-      "lastName": "Hassan",
-      "role": "tourist",
-      "isActive": true,
-      "createdAt": "2025-11-23T20:00:00.000Z"
-    },
-    {
-      "id": 2,
-      "email": "admin@egytravel.com",
-      "firstName": "Admin",
-      "lastName": "User",
-      "role": "admin",
-      "isActive": true,
-      "createdAt": "2025-11-23T19:00:00.000Z"
-    }
-  ]
-}
-```
-
----
-
-### **10. Update User Role (Admin Only)**
-
-```http
-PUT http://localhost:3000/api/users/admin/users/1/role
-Authorization: Bearer ADMIN_ACCESS_TOKEN
-Content-Type: application/json
-
-{
-  "role": "admin"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "User role updated successfully",
-  "data": {
-    "id": 1,
-    "email": "tourist@example.com",
-    "role": "admin"
-  }
-}
-```
-
----
-
 ## 🧪 Postman Testing Steps
 
-### **Step 1: Register a New User**
+### **Step 1: Register**
 
-1. Open Postman
-2. Create a new request:
-   - Method: `POST`
-   - URL: `http://localhost:3000/api/auth/register`
-   - Headers: `Content-Type: application/json`
-   - Body (raw JSON):
-   ```json
-   {
-     "email": "test@egytravel.com",
-     "password": "Test123456",
-     "firstName": "Test",
-     "lastName": "User"
-   }
-   ```
-3. Click **Send**
-4. **Copy the `accessToken`** from the response
-
----
-
-### **Step 2: Test Login**
-
-1. Create a new request:
-   - Method: `POST`
-   - URL: `http://localhost:3000/api/auth/login`
-   - Headers: `Content-Type: application/json`
-   - Body (raw JSON):
-   ```json
-   {
-     "email": "test@egytravel.com",
-     "password": "Test123456"
-   }
-   ```
-2. Click **Send**
-3. **Copy the `accessToken`** from the response
-
----
-
-### **Step 3: Get Your Profile (Protected Route)**
-
-1. Create a new request:
-   - Method: `GET`
-   - URL: `http://localhost:3000/api/users/profile`
-   - Headers:
-     - Go to **Authorization** tab
-     - Type: `Bearer Token`
-     - Token: Paste your `accessToken`
-2. Click **Send**
-3. You should see your user profile
-
----
-
-### **Step 4: Update Your Profile**
-
-1. Create a new request:
-   - Method: `PUT`
-   - URL: `http://localhost:3000/api/users/profile`
-   - Authorization: `Bearer Token` (paste your token)
-   - Headers: `Content-Type: application/json`
-   - Body (raw JSON):
-   ```json
-   {
-     "firstName": "Ahmed",
-     "lastName": "Mohamed",
-     "phone": "+201234567890",
-     "nationality": "Egyptian"
-   }
-   ```
-2. Click **Send**
-
----
-
-## 🔒 Testing Authorization
-
-### **Test Unauthorized Access**
-
-Try accessing a protected route without a token:
-
-```http
-GET http://localhost:3000/api/users/profile
-```
-
-**Expected Response (401 Unauthorized):**
+- Method: `POST`
+- URL: `http://localhost:3000/api/auth/register`
+- Body (raw JSON):
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "AUTHENTICATION_REQUIRED",
-    "message": "Access token is required"
-  }
+  "name": "Test User",
+  "email": "test@example.com",
+  "password": "Test@1234"
 }
 ```
+- Expected: `201` with `emailVerified: false` — **no token yet**
 
 ---
 
-### **Test Invalid Token**
+### **Step 2: Verify Email**
 
-Try with an invalid token:
-
-```http
-GET http://localhost:3000/api/users/profile
-Authorization: Bearer invalid_token_here
-```
-
-**Expected Response (401 Unauthorized):**
+- Check your inbox for the 6-digit OTP
+- Method: `POST`
+- URL: `http://localhost:3000/api/auth/verify-email`
+- Body:
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "TOKEN_INVALID",
-    "message": "Invalid access token"
-  }
+  "email": "test@example.com",
+  "otp": "PASTE_OTP_HERE"
 }
 ```
+- Expected: `200` with a `token` in the response
+- **Save the token** — set it as `{{token}}` in your Postman environment
 
 ---
 
-### **Test Admin-Only Endpoint as Tourist**
+### **Step 3: Login (after verification)**
 
-Try accessing admin endpoint with tourist token:
-
-```http
-GET http://localhost:3000/api/users/admin/users
-Authorization: Bearer TOURIST_TOKEN
-```
-
-**Expected Response (403 Forbidden):**
+- Method: `POST`
+- URL: `http://localhost:3000/api/auth/login`
+- Body:
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "INSUFFICIENT_PERMISSIONS",
-    "message": "Admin access required"
-  }
+  "email": "test@example.com",
+  "password": "Test@1234"
 }
 ```
+- Expected: `200` with token
+
+---
+
+### **Step 4: Test Protected Route**
+
+- Method: `GET`
+- URL: `http://localhost:3000/api/auth/me`
+- Authorization tab → Bearer Token → paste your token
+- Expected: `200` with user profile
+
+---
+
+### **Step 5: Test Login Before Verification (negative test)**
+
+Register a new user but skip the verify-email step, then try to login:
+- Expected: `403 EMAIL NOT VERIFIED`
+
+---
+
+## 🔒 Error Scenarios to Test
+
+| Scenario | Expected Code |
+|----------|--------------|
+| Login before verifying email | `403` |
+| Wrong OTP | `400 INVALID_OTP` |
+| Expired OTP (wait 10 min) | `400 OTP_EXPIRED` |
+| Wrong password on login | `401 INVALID CREDENTIALS` |
+| Access protected route without token | `401` |
+| Register with existing email | `409 USER ALREADY EXISTS` |
+| OTP wrong 5+ times | `400 TOO_MANY_ATTEMPTS` |
 
 ---
 
 ## 📊 Response Codes
 
-- `200` - Success
-- `201` - Created (registration successful)
-- `400` - Bad Request (validation error)
-- `401` - Unauthorized (missing/invalid token)
-- `403` - Forbidden (insufficient permissions)
-- `404` - Not Found (user not found)
-- `409` - Conflict (email already exists)
-- `429` - Too Many Requests (rate limit exceeded)
-- `500` - Internal Server Error
+| Code | Meaning |
+|------|---------|
+| `200` | Success |
+| `201` | Created (registration) |
+| `400` | Bad request / invalid OTP |
+| `401` | Wrong credentials / missing token |
+| `403` | Email not verified |
+| `404` | User not found |
+| `409` | Email already registered |
+| `429` | Rate limit exceeded |
+| `500` | Internal server error |
 
 ---
 
-## ⚡ Quick Test Collection
+## ✅ Endpoints Summary
 
-### **Create Admin User (For Testing)**
-
-You can manually create an admin user in the database:
-
-```sql
-UPDATE users SET role = 'admin' WHERE email = 'test@egytravel.com';
-```
-
-Or register normally and then update via database.
-
----
-
-## 🎯 Common Test Scenarios
-
-### **1. Complete Registration Flow**
-```
-Register → Login → Get Profile → Update Profile → Logout
-```
-
-### **2. Password Reset Flow**
-```
-Forgot Password → (Check email/logs for token) → Reset Password → Login with new password
-```
-
-### **3. Token Refresh Flow**
-```
-Login → Wait for token to expire → Use refresh token → Get new access token
-```
-
-### **4. Admin Flow**
-```
-Login as admin → Get all users → Update user role → Verify changes
-```
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/register` | No | Register — sends OTP email |
+| POST | `/api/auth/verify-email` | No | Verify OTP → returns JWT |
+| POST | `/api/auth/resend-otp` | No | Resend OTP code |
+| POST | `/api/auth/login` | No | Login (verified users only) |
+| GET | `/api/auth/me` | Yes | Get current user profile |
+| POST | `/api/auth/forgot-password` | No | Send password reset code |
+| POST | `/api/auth/reset-password` | No | Reset password with code |
+| POST | `/api/auth/refresh` | No | Refresh access token |
+| POST | `/api/auth/logout` | Yes | Logout |
 
 ---
 
 ## 🔍 Debugging Tips
 
-### **Check Server Logs**
-
-The server logs will show:
-- All API requests
-- Authentication attempts
-- Errors and stack traces
-
-### **Check Database**
-
-Query the database to verify data:
-
-```sql
--- Check users
-SELECT * FROM users;
-
--- Check password reset tokens
-SELECT * FROM password_reset_tokens;
+Check server logs for OTP values during development:
+```
+logger.info('OTP email sent', { to, messageId: data?.id })
 ```
 
----
+Check MongoDB for OTP records:
+```js
+db.email_otps.find({ email: "test@example.com" })
+```
 
-## ✅ All Endpoints Summary
-
-| Method | Endpoint | Auth Required | Description |
-|--------|----------|---------------|-------------|
-| POST | `/api/auth/register` | No | Register new user |
-| POST | `/api/auth/login` | No | Login user |
-| POST | `/api/auth/logout` | Yes | Logout user |
-| POST | `/api/auth/refresh` | No | Refresh access token |
-| POST | `/api/auth/forgot-password` | No | Request password reset |
-| POST | `/api/auth/reset-password` | No | Reset password |
-| GET | `/api/users/profile` | Yes | Get user profile |
-| PUT | `/api/users/profile` | Yes | Update user profile |
-| GET | `/api/users/admin/users` | Yes (Admin) | Get all users |
-| PUT | `/api/users/admin/users/:id/role` | Yes (Admin) | Update user role |
-
----
-
-**Happy Testing! 🚀**
+Check SQL for verification status:
+```sql
+SELECT user_id, email, is_verified FROM users;
+```

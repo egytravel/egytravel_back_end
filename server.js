@@ -23,6 +23,7 @@ const reviewRoutes = require('./src/routes/reviews');
 const communityRoutes = require('./src/routes/community');
 const tripRoutes = require('./src/routes/trips');
 const eventRoutes = require('./src/routes/events');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -115,6 +116,30 @@ app.use('/api/trips', limiter, tripRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/events', eventRoutes);
+
+// ─── Google Places Photo Proxy ────────────────────────────────────────────────
+// GET /api/places/photo?ref=PHOTO_REFERENCE&maxwidth=800
+// Proxies Google photo requests server-side so the API key is never exposed to clients
+app.get('/api/places/photo', async (req, res) => {
+  const { ref, maxwidth = 800 } = req.query;
+  if (!ref) return res.status(400).json({ error: 'ref parameter is required' });
+  if (!process.env.GOOGLE_PLACES_API_KEY) return res.status(503).json({ error: 'Photo service not configured' });
+
+  try {
+    const response = await axios.get('https://maps.googleapis.com/maps/api/place/photo', {
+      params: { maxwidth, photo_reference: ref, key: process.env.GOOGLE_PLACES_API_KEY },
+      responseType: 'stream',
+      timeout: 10000,
+      maxRedirects: 5
+    });
+    res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // cache 24h in browser
+    response.data.pipe(res);
+  } catch (error) {
+    logger.error('Photo proxy error', { ref: ref?.substring(0, 20), error: error.message });
+    res.status(502).json({ error: 'Failed to fetch photo' });
+  }
+});
 
 // 404 handler
 app.use('*', (req, res) => {

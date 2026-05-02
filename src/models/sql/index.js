@@ -3,6 +3,7 @@ const sequelize = require('../../config/database');
 const User = require('./User');
 const PasswordResetToken = require('./PasswordResetToken');
 const Trip = require('./Trip');
+const TripDay = require('./TripDay');
 const Booking = require('./Booking');
 const Favorite = require('./Favorite');
 const Review = require('./Review');
@@ -54,10 +55,23 @@ Trip.belongsTo(User, {
   onDelete: 'CASCADE'
 });
 
+Trip.hasMany(TripDay, {
+  foreignKey: 'trip_id',
+  as: 'days',
+  onDelete: 'CASCADE'
+});
+
 Trip.hasMany(Booking, {
   foreignKey: 'trip_id',
   as: 'bookings',
   onDelete: 'SET NULL'
+});
+
+// TripDay associations
+TripDay.belongsTo(Trip, {
+  foreignKey: 'trip_id',
+  as: 'trip',
+  onDelete: 'CASCADE'
 });
 
 // Booking associations
@@ -121,7 +135,7 @@ const syncDatabase = async (force = false) => {
 };
 
 module.exports = {
-  sequelize, User, PasswordResetToken, Trip, Booking,
+  sequelize, User, PasswordResetToken, Trip, TripDay, Booking,
   Favorite, Review, Post, PostLike, PostComment,
   Event, Place, Notification, syncDatabase
 };

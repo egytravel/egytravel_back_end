@@ -40,17 +40,17 @@ exports.register = async (req, res) => {
       logger.error('OTP email failed', { email, error: err.message })
     );
 
+    // Return response WITHOUT a token — user must verify email before logging in
     res.status(201).json({
       code: 201,
       message: 'REGISTRATION SUCCESSFUL',
       data: {
-        token: result.tokens.accessToken,
         user_id: result.user.user_id,
         name: result.user.name,
         email: result.user.email,
         role: result.user.role,
         emailVerified: false,
-        message: 'A verification code has been sent to your email'
+        message: 'A verification code has been sent to your email. Please verify before logging in.'
       }
     });
   } catch (error) {
@@ -105,14 +105,31 @@ exports.verifyEmail = async (req, res) => {
     record.verified = true;
     await record.save();
 
-    // Send welcome email
+    // Mark user as verified in SQL DB + send welcome email
     const { User } = require('../models/sql');
     const user = await User.findOne({ where: { email: email.toLowerCase() } });
     if (user) {
+      user.is_verified = true;
+      await user.save();
       sendWelcomeEmail(email, user.name).catch(() => {});
     }
 
-    res.json({ success: true, message: 'Email verified successfully! Welcome to EgyTravel.' });
+    // Generate tokens now that email is verified
+    const JWTService = require('../services/jwtService');
+    const tokens = user ? JWTService.generateTokenPair(user) : null;
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully! Welcome to EgyTravel.',
+      data: tokens ? {
+        token: tokens.accessToken,
+        user_id: user.user_id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        emailVerified: true
+      } : undefined
+    });
   } catch (error) {
     logger.error('Verify email error:', error);
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Verification failed' } });

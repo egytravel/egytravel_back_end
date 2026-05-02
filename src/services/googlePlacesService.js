@@ -20,7 +20,7 @@ async function findPlaceId(name, lat, lng) {
         input: name,
         inputtype: 'textquery',
         locationbias: `point:${lat},${lng}`,
-        fields: 'place_id,name,rating,user_ratings_total',
+        fields: 'place_id,name,rating',
         key: API_KEY
       },
       timeout: 8000
@@ -52,7 +52,7 @@ async function getPlaceDetails(placeId) {
     const response = await axios.get(`${BASE_URL}/details/json`, {
       params: {
         place_id: placeId,
-        fields: 'name,rating,user_ratings_total,reviews,photos,formatted_address,opening_hours',
+        fields: 'name,rating,reviews,photos,formatted_address,opening_hours,geometry',
         key: API_KEY,
         language: 'en'
       },
@@ -69,8 +69,11 @@ async function getPlaceDetails(placeId) {
       googlePlaceId: placeId,
       name: result.name,
       rating: result.rating || 0,
-      totalRatings: result.user_ratings_total || 0,
       address: result.formatted_address || '',
+      // Precise coordinates from Google — use these for map pin
+      location: result.geometry?.location
+        ? { lat: result.geometry.location.lat, lng: result.geometry.location.lng }
+        : null,
       openingHours: result.opening_hours?.weekday_text || [],
       reviews: (result.reviews || []).map(r => ({
         id: `google_${r.time}`,
@@ -84,12 +87,13 @@ async function getPlaceDetails(placeId) {
       })),
       photos: (result.photos || []).slice(0, 5).map(p => ({
         reference: p.photo_reference,
-        url: `${BASE_URL}/photo?maxwidth=800&photo_reference=${p.photo_reference}&key=${API_KEY}`
+        // Full proxy URL — client calls our server which fetches from Google server-side
+        url: `${process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com'}/api/places/photo?ref=${p.photo_reference}`
       }))
     };
 
-    // Cache for 24 hours — Google reviews don't change that often
-    cacheService.set(cacheKey, formatted, 86400);
+    // Cache for 6 hours — photo_reference tokens expire, don't cache too long
+    cacheService.set(cacheKey, formatted, 21600);
     return formatted;
   } catch (error) {
     logger.error('Google Places getPlaceDetails failed', { placeId, error: error.message });
@@ -108,8 +112,8 @@ async function getReviewsForDestination(destinationId, destinationName, lat, lng
   const placeId = await findPlaceId(destinationName + ' Egypt', lat, lng);
   if (!placeId) return null;
 
-  // Cache the place ID mapping for future calls
-  cacheService.set(`google_placeid_${destinationId}`, placeId, 86400 * 7); // cache 7 days
+  // Cache the place ID mapping for future calls (1 day)
+  cacheService.set(`google_placeid_${destinationId}`, placeId, 86400);
 
   return await getPlaceDetails(placeId);
 }

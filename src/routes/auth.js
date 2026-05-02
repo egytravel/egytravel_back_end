@@ -45,6 +45,13 @@ router.post('/login', authRateLimit, validateLogin, async (req, res) => {
     if (error.message.includes('Invalid email or password')) {
       return res.status(401).json({ code: 401, message: 'INVALID CREDENTIALS', data: null });
     }
+    if (error.code === 'EMAIL_NOT_VERIFIED') {
+      return res.status(403).json({
+        code: 403,
+        message: 'EMAIL NOT VERIFIED',
+        data: { email: req.body.email, message: error.message }
+      });
+    }
     res.status(500).json({ code: 500, message: 'LOGIN FAILED', data: null });
   }
 });

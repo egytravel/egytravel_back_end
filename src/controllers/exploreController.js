@@ -3,6 +3,7 @@ const openTripMapService = require('../services/openTripMapService');
 const bookingHotelService = require('../services/bookingComRapidService');
 const bookingFlightService = require('../services/bookingComFlightService');
 const { getWikipediaSummary } = require('../services/wikipediaService');
+const { getReviewsForDestination } = require('../services/googlePlacesService');
 const logger = require('../utils/logger');
 
 // Default search params for explore screen (today + 2 days)
@@ -136,25 +137,59 @@ exports.getPlaces = async (req, res) => {
 
 /**
  * GET /api/explore/places/:id
- * Single place — checks static first, then OpenTripMap
+ * Single place — checks static first, then OpenTripMap, enriches with Google
  */
 exports.getPlaceById = async (req, res) => {
   try {
     const { id } = req.params;
 
     // Check static data first
-    const staticPlace = staticPlaces.find(p => p.id === id);
-    if (staticPlace) {
-      return res.json({ success: true, source: 'static', data: staticPlace });
+    let place = staticPlaces.find(p => p.id === id);
+    let source = 'static';
+
+    if (!place) {
+      // Try OpenTripMap (xid)
+      try {
+        place = await openTripMapService.getPlaceDetails(id);
+        source = 'opentripmap';
+      } catch (err) {
+        return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Place not found' } });
+      }
     }
 
-    // Try OpenTripMap (xid)
-    try {
-      const place = await openTripMapService.getPlaceDetails(id);
-      return res.json({ success: true, source: 'opentripmap', data: place });
-    } catch (err) {
-      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Place not found' } });
+    // Enrich with Google Places — real photos and reviews
+    let googleData = null;
+    if (process.env.GOOGLE_PLACES_API_KEY && place.lat && place.lng) {
+      googleData = await getReviewsForDestination(
+        id,
+        place.name || place.title,
+        place.lat,
+        place.lng
+      );
     }
+
+    const enriched = { ...place };
+
+    // Google photos replace static images
+    if (googleData?.photos?.length) {
+      const googlePhotoUrls = googleData.photos.map(p => p.url);
+      enriched.images = googlePhotoUrls;
+      enriched.coverImage = googlePhotoUrls[0];
+    }
+
+    if (googleData) {
+      enriched.googleRating = googleData.rating;
+      enriched.googleReviews = googleData.reviews;
+      enriched.address = googleData.address || enriched.address;
+      if (googleData.location) {
+        enriched.lat = googleData.location.lat;
+        enriched.lng = googleData.location.lng;
+        enriched.mapLocation = googleData.location;
+      }
+      if (googleData.openingHours?.length) enriched.openingHours = googleData.openingHours;
+    }
+
+    return res.json({ success: true, source, data: enriched });
   } catch (error) {
     logger.error('Get place by id error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load place' } });

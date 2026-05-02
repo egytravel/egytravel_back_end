@@ -1,4 +1,4 @@
-const { Trip, Booking } = require('../models/sql');
+const { Trip, TripDay, Booking } = require('../models/sql');
 const logger = require('../utils/logger');
 
 /**
@@ -52,7 +52,10 @@ exports.getTrips = async (req, res) => {
     const trips = await Trip.findAll({
       where,
       order: [['created_at', 'DESC']],
-      include: [{ model: Booking, as: 'bookings', attributes: ['booking_id', 'booking_type', 'status', 'hotel_name', 'airline'] }]
+      include: [
+        { model: TripDay, as: 'days', attributes: ['day_id', 'day_number', 'date', 'title'], order: [['day_number', 'ASC']] },
+        { model: Booking, as: 'bookings', attributes: ['booking_id', 'booking_type', 'status', 'hotel_name', 'airline'] }
+      ]
     });
 
     res.json({ success: true, count: trips.length, data: trips.map(t => t.toJSON()) });
@@ -73,7 +76,10 @@ exports.getTrip = async (req, res) => {
 
     const trip = await Trip.findOne({
       where: { trip_id: tripId, user_id: userId },
-      include: [{ model: Booking, as: 'bookings' }]
+      include: [
+        { model: TripDay, as: 'days', order: [['day_number', 'ASC']] },
+        { model: Booking, as: 'bookings' }
+      ]
     });
 
     if (!trip) {
