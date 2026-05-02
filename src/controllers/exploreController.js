@@ -50,7 +50,7 @@ exports.getExploreData = async (req, res) => {
       data: {
         categories: CATEGORIES,
         popularPlaces: staticPlaces,
-        restaurants: restaurants.slice(0, 4),
+        restaurants: staticRestaurants.slice(0, 4),
         hotels,
         flights
       }
