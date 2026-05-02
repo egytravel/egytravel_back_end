@@ -60,11 +60,21 @@ exports.getAllDestinations = async (req, res) => {
     if (featured === 'true') results = results.filter(d => d.featured);
     if (popular === 'true') results = results.filter(d => d.popular);
 
-    res.json({
-      success: true,
-      count: results.length,
-      data: results
-    });
+    // Enrich all with Google photos
+    if (process.env.GOOGLE_PLACES_API_KEY) {
+      results = await Promise.all(
+        results.map(async (d) => {
+          const googleData = await getReviewsForDestination(
+            d.id, d.googleSearchName || d.name, d.lat, d.lng
+          ).catch(() => null);
+          if (!googleData?.photos?.length) return d;
+          const urls = googleData.photos.map(p => p.url);
+          return { ...d, images: urls, coverImage: urls[0] };
+        })
+      );
+    }
+
+    res.json({ success: true, count: results.length, data: results });
   } catch (error) {
     logger.error('Get destinations error', { error: error.message });
     res.status(500).json({

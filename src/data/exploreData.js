@@ -399,7 +399,9 @@ const popularFlightRoutes = [
     duration: '1h 10m',
     category: 'Economy',
     airline: 'EgyptAir',
-    frequency: 'Daily'
+    airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
+    frequency: 'Daily',
+    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
   },
   {
     id: 'cai-asw',
@@ -415,7 +417,9 @@ const popularFlightRoutes = [
     duration: '1h 30m',
     category: 'Economy',
     airline: 'EgyptAir',
-    frequency: 'Daily'
+    airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
+    frequency: 'Daily',
+    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
   },
   {
     id: 'cai-hrg',
@@ -431,7 +435,9 @@ const popularFlightRoutes = [
     duration: '55m',
     category: 'Economy',
     airline: 'EgyptAir',
-    frequency: 'Daily'
+    airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
+    frequency: 'Daily',
+    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
   },
   {
     id: 'cai-ssh',
@@ -447,7 +453,9 @@ const popularFlightRoutes = [
     duration: '1h',
     category: 'Economy',
     airline: 'EgyptAir',
-    frequency: 'Daily'
+    airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
+    frequency: 'Daily',
+    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
   },
   {
     id: 'cai-aly',
@@ -463,7 +471,9 @@ const popularFlightRoutes = [
     duration: '45m',
     category: 'Economy',
     airline: 'EgyptAir',
-    frequency: 'Daily'
+    airlineLogo: 'https://www.egyptair.com/Style%20Library/EgyptAir/images/logo.png',
+    frequency: 'Daily',
+    bookingUrl: 'https://www.egyptair.com/en/fly/Pages/book-a-flight.aspx'
   }
 ];
 

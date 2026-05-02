@@ -147,6 +147,10 @@ function formatFlight(offer, originCode, destCode) {
     },
     baggage: offer.includedCheckedBags || null,
     bookingToken: offer.token,
+    // Deep link to Booking.com flight booking page
+    bookingUrl: offer.token
+      ? `https://www.booking.com/flights/confirmation.html?token=${offer.token}`
+      : null,
     source: 'booking.com'
   };
 }
