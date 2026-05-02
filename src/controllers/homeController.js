@@ -23,9 +23,17 @@ exports.getHomeData = async (req, res) => {
       return { ...d, images: urls, coverImage: urls[0] };
     };
 
-    const [enrichFeatured, enrichPopular] = await Promise.all([
+    const [enrichFeatured, enrichPopular, enrichCities] = await Promise.all([
       Promise.all(featured.map(enrichWithGoogle)),
-      Promise.all(popular.map(enrichWithGoogle))
+      Promise.all(popular.map(enrichWithGoogle)),
+      Promise.all(cities.map(async (city) => {
+        if (!process.env.GOOGLE_PLACES_API_KEY) return city;
+        const googleData = await getReviewsForDestination(
+          city.id, city.googleSearchName || city.name, city.lat, city.lng
+        ).catch(() => null);
+        if (!googleData?.photos?.length) return city;
+        return { ...city, coverImage: googleData.photos[0].url };
+      }))
     ]);
 
     res.json({
@@ -33,7 +41,7 @@ exports.getHomeData = async (req, res) => {
       data: {
         featured: enrichFeatured,
         popular: enrichPopular,
-        destinations: cities
+        destinations: enrichCities
       }
     });
   } catch (error) {
