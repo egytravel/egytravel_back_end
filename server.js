@@ -142,28 +142,38 @@ app.get('/api/places/photo', async (req, res) => {
 });
 
 // ─── General Image Proxy ──────────────────────────────────────────────────────
-// GET /api/image-proxy?url=ENCODED_URL
+// GET /api/image-proxy?b64=BASE64_ENCODED_URL  (preferred — no URL parsing issues)
+// GET /api/image-proxy?url=ENCODED_URL         (legacy fallback)
 // Proxies any external image through our server so Flutter can load it reliably
-// Handles CDN URLs from Booking.com, airline logos, etc.
 app.get('/api/image-proxy', async (req, res) => {
-  const { url } = req.query;
-  if (!url) return res.status(400).json({ error: 'url parameter is required' });
+  let decodedUrl;
+
+  // Prefer base64 encoding (no special char issues)
+  if (req.query.b64) {
+    try {
+      decodedUrl = Buffer.from(req.query.b64, 'base64url').toString('utf8');
+    } catch {
+      return res.status(400).json({ error: 'Invalid b64 parameter' });
+    }
+  } else if (req.query.url) {
+    decodedUrl = req.query.url;
+  } else {
+    return res.status(400).json({ error: 'url or b64 parameter is required' });
+  }
 
   // Only allow known safe domains
   const allowedDomains = [
-    'cf.bstatic.com',       // Booking.com hotel photos
-    'q-xx.bstatic.com',     // Booking.com CDN
-    't-cf.bstatic.com',     // Booking.com CDN
-    'r-xx.bstatic.com',     // Booking.com CDN
-    'logos.skyscnr.com',    // Skyscanner airline logos
-    'images.kiwi.com',      // Kiwi.com
-    'content.r9cdn.net',    // Booking.com flights
-    'booking.com',          // General Booking.com
+    'cf.bstatic.com',
+    'q-xx.bstatic.com',
+    't-cf.bstatic.com',
+    'r-xx.bstatic.com',
+    'logos.skyscnr.com',
+    'images.kiwi.com',
+    'content.r9cdn.net',
+    'booking.com',
   ];
 
-  let decodedUrl;
   try {
-    decodedUrl = decodeURIComponent(url);
     const urlObj = new URL(decodedUrl);
     const isAllowed = allowedDomains.some(d => urlObj.hostname.includes(d));
     if (!isAllowed) {

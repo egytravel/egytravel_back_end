@@ -8,9 +8,11 @@ const RAPIDAPI_HOST = 'booking-com.p.rapidapi.com';
 const APP_URL = process.env.APP_URL || 'https://egy-travel-89eca3b6683d.herokuapp.com';
 
 // Wrap a Booking.com CDN URL through our image proxy so Flutter can load it reliably
+// Uses base64 encoding to avoid URL parsing issues with special characters
 function proxyImage(url) {
   if (!url) return null;
-  return `${APP_URL}/api/image-proxy?url=${encodeURIComponent(url)}`;
+  const encoded = Buffer.from(url).toString('base64url'); // base64url = no +/= chars
+  return `${APP_URL}/api/image-proxy?b64=${encoded}`;
 }
 
 // Egyptian city destination IDs from Booking.com
