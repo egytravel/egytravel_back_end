@@ -78,8 +78,8 @@ exports.createPost = async (req, res) => {
     logger.info('Post created', { postId: post._id, userId: req.user.user_id, imageCount: imageUrls.length });
     res.status(201).json({ success: true, data: formatPost(post.toObject(), req.user.user_id) });
   } catch (error) {
-    logger.error('Create post error', { error: error.message });
-    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create post' } });
+    logger.error('Create post error', { error: error.message, stack: error.stack });
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message || 'Failed to create post' } });
   }
 };
 
