@@ -48,6 +48,12 @@ exports.createPost = async (req, res) => {
 
     if (req.files && req.files.length > 0) {
       // multipart/form-data — upload files to Cloudinary
+      if (!process.env.CLOUDINARY_CLOUD_NAME) {
+        return res.status(503).json({
+          success: false,
+          error: { code: 'UPLOAD_NOT_CONFIGURED', message: 'Image upload service not configured. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to Heroku config vars.' }
+        });
+      }
       const { uploadImage } = require('../services/uploadService');
       imageUrls = await Promise.all(
         req.files.map(file => uploadImage(file.buffer, { folder: 'egytravel/community' }))
