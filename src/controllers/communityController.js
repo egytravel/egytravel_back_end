@@ -31,20 +31,37 @@ exports.getFeed = async (req, res) => {
 
 /**
  * POST /api/community/posts
+ * Create a post — supports both:
+ *   1. JSON body with image URLs already uploaded: { caption, images: ["https://..."] }
+ *   2. multipart/form-data with image files: images[] + caption (uploads to Cloudinary automatically)
  */
 exports.createPost = async (req, res) => {
   try {
-    const { caption, images, placeId, placeName, placeType, rating, visitDate } = req.body;
+    const { caption, placeId, placeName, placeType, rating, visitDate } = req.body;
 
     if (!caption?.trim()) {
       return res.status(400).json({ success: false, error: { code: 'MISSING_REQUIRED_PARAMS', message: 'Caption is required' } });
+    }
+
+    // Handle images — either already-uploaded URLs (JSON) or files (multipart)
+    let imageUrls = [];
+
+    if (req.files && req.files.length > 0) {
+      // multipart/form-data — upload files to Cloudinary
+      const { uploadImage } = require('../services/uploadService');
+      imageUrls = await Promise.all(
+        req.files.map(file => uploadImage(file.buffer, { folder: 'egytravel/community' }))
+      );
+    } else if (req.body.images) {
+      // JSON body — images already uploaded, just use the URLs
+      imageUrls = Array.isArray(req.body.images) ? req.body.images : [req.body.images];
     }
 
     const post = await Post.create({
       userId: req.user.user_id,
       authorName: req.user.name,
       caption: caption.trim(),
-      images: images || [],
+      images: imageUrls,
       placeId: placeId || null,
       placeName: placeName || null,
       placeType: placeType || null,
@@ -52,7 +69,7 @@ exports.createPost = async (req, res) => {
       visitDate: visitDate || null
     });
 
-    logger.info('Post created', { postId: post._id, userId: req.user.user_id });
+    logger.info('Post created', { postId: post._id, userId: req.user.user_id, imageCount: imageUrls.length });
     res.status(201).json({ success: true, data: formatPost(post.toObject(), req.user.user_id) });
   } catch (error) {
     logger.error('Create post error', { error: error.message });
