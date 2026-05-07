@@ -142,18 +142,20 @@ exports.updateDay = async (req, res) => {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Day not found' } });
     }
 
-    if (date !== undefined)        day.date        = date;
-    if (title !== undefined)       day.title       = title;
-    if (description !== undefined) day.description = description;
-    if (activities !== undefined)  day.activities  = activities;
-    if (locations !== undefined)   day.locations   = locations;
-    if (budget !== undefined)      day.budget      = budget;
-    if (notes !== undefined)       day.notes       = notes;
+    const updates = {};
+    if (date !== undefined)        updates.date        = date;
+    if (title !== undefined)       updates.title       = title;
+    if (description !== undefined) updates.description = description;
+    if (activities !== undefined)  updates.activities  = activities;
+    if (locations !== undefined)   updates.locations   = locations;
+    if (budget !== undefined)      updates.budget      = budget;
+    if (notes !== undefined)       updates.notes       = notes;
 
-    await day.save();
+    await TripDay.update(updates, { where: { day_id: dayId, trip_id: tripId } });
+    const updatedDay = await TripDay.findOne({ where: { day_id: dayId, trip_id: tripId } });
 
     logger.info('Trip day updated', { dayId, tripId, userId });
-    res.json({ success: true, data: day.toJSON() });
+    res.json({ success: true, data: updatedDay.toJSON() });
   } catch (error) {
     logger.error('Update trip day error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to update day' } });
@@ -271,31 +273,35 @@ exports.addPlaceToDay = async (req, res) => {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Day not found' } });
     }
 
-    // Add to locations array
-    const locations = day.locations || [];
+    // Add to locations array — use spread to create new array (forces Sequelize to detect change)
+    const locations = [...(day.locations || [])];
     const newPlace = {
       id: placeId || null,
       name,
       lat: parseFloat(lat),
       lng: parseFloat(lng),
-      type,  // 'place', 'hotel', 'restaurant', 'destination'
+      type,
       notes: notes || null
     };
     locations.push(newPlace);
-    day.locations = locations;
 
-    // Also add to activities as a text entry
-    const activities = day.activities || [];
+    const activities = [...(day.activities || [])];
     activities.push(`Visit ${name}`);
-    day.activities = activities;
 
-    await day.save();
+    // Use update() instead of save() to force JSON field persistence
+    await TripDay.update(
+      { locations, activities },
+      { where: { day_id: dayId, trip_id: tripId } }
+    );
+
+    // Fetch fresh from DB to confirm
+    const updatedDay = await TripDay.findOne({ where: { day_id: dayId, trip_id: tripId } });
 
     logger.info('Place added to day', { dayId, tripId, userId, name });
     res.status(201).json({
       success: true,
       data: {
-        day: day.toJSON(),
+        day: updatedDay.toJSON(),
         addedPlace: newPlace
       }
     });
@@ -325,16 +331,20 @@ exports.removePlaceFromDay = async (req, res) => {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Day not found' } });
     }
 
-    const locations = day.locations || [];
+    const locations = [...(day.locations || [])];
     if (idx < 0 || idx >= locations.length) {
       return res.status(400).json({ success: false, error: { code: 'INVALID_INDEX', message: 'Invalid place index' } });
     }
 
     const removed = locations.splice(idx, 1)[0];
-    day.locations = locations;
-    await day.save();
 
-    res.json({ success: true, message: `Removed "${removed.name}" from day`, data: day.toJSON() });
+    await TripDay.update(
+      { locations },
+      { where: { day_id: dayId, trip_id: tripId } }
+    );
+
+    const updatedDay = await TripDay.findOne({ where: { day_id: dayId, trip_id: tripId } });
+    res.json({ success: true, message: `Removed "${removed.name}" from day`, data: updatedDay.toJSON() });
   } catch (error) {
     logger.error('Remove place from day error', { error: error.message });
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to remove place' } });
