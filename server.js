@@ -25,6 +25,7 @@ const communityRoutes = require('./src/routes/community');
 const tripRoutes = require('./src/routes/trips');
 const eventRoutes = require('./src/routes/events');
 const uploadRoutes = require('./src/routes/upload');
+const aiRoutes = require('./src/routes/ai');
 const axios = require('axios');
 
 const app = express();
@@ -119,6 +120,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/ai', aiRoutes);
 
 // ─── Google Places Photo Proxy ────────────────────────────────────────────────
 // GET /api/places/photo?id=SHORT_HASH  (new — short URL, Flutter-friendly)
