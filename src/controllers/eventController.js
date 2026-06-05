@@ -1,6 +1,23 @@
 const { Event, User } = require('../models/sql');
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
+const { uploadImage } = require('../services/uploadService');
+
+// Helper — upload files to Cloudinary if present, otherwise use URL strings from body
+async function resolveImages(req) {
+  if (req.files && req.files.length > 0) {
+    if (!process.env.CLOUDINARY_CLOUD_NAME) {
+      throw Object.assign(new Error('Image upload service not configured'), { code: 'UPLOAD_NOT_CONFIGURED', status: 503 });
+    }
+    return Promise.all(
+      req.files.map(file => uploadImage(file.buffer, { folder: 'egytravel/events' }))
+    );
+  }
+  if (req.body.images) {
+    return Array.isArray(req.body.images) ? req.body.images : [req.body.images];
+  }
+  return null; // no images provided — keep existing or leave empty
+}
 
 /**
  * GET /api/events
@@ -66,12 +83,13 @@ exports.getEvent = async (req, res) => {
 /**
  * POST /api/events
  * Create event — ADMIN ONLY
+ * Supports multipart/form-data with images[] files OR JSON body with image URLs
  */
 exports.createEvent = async (req, res) => {
   try {
     const {
       title, description, shortDescription, category, location, city,
-      lat, lng, startDate, endDate, images, coverImage,
+      lat, lng, startDate, endDate, coverImage,
       ticketUrl, price, isFree, isFeatured, tags
     } = req.body;
 
@@ -81,6 +99,20 @@ exports.createEvent = async (req, res) => {
         error: { code: 'MISSING_REQUIRED_PARAMS', message: 'title, description, location, and startDate are required' }
       });
     }
+
+    // Resolve images — files uploaded via multipart OR URLs in JSON body
+    let imageUrls = [];
+    try {
+      imageUrls = (await resolveImages(req)) || [];
+    } catch (uploadErr) {
+      return res.status(uploadErr.status || 503).json({
+        success: false,
+        error: { code: uploadErr.code || 'UPLOAD_FAILED', message: uploadErr.message }
+      });
+    }
+
+    // First image becomes cover if not explicitly provided
+    const resolvedCover = coverImage || (imageUrls.length > 0 ? imageUrls[0] : null);
 
     const event = await Event.create({
       created_by: req.user.user_id,
@@ -94,8 +126,8 @@ exports.createEvent = async (req, res) => {
       lng: lng || null,
       start_date: startDate,
       end_date: endDate || null,
-      images: images || [],
-      cover_image: coverImage || null,
+      images: imageUrls,
+      cover_image: resolvedCover,
       ticket_url: ticketUrl || null,
       price: price || null,
       is_free: isFree || false,
@@ -104,7 +136,7 @@ exports.createEvent = async (req, res) => {
       tags: tags || null
     });
 
-    logger.info('Event created', { eventId: event.event_id, adminId: req.user.user_id });
+    logger.info('Event created', { eventId: event.event_id, adminId: req.user.user_id, imageCount: imageUrls.length });
     res.status(201).json({ success: true, data: formatEvent(event) });
   } catch (error) {
     logger.error('Create event error', { error: error.message });
@@ -115,6 +147,7 @@ exports.createEvent = async (req, res) => {
 /**
  * PUT /api/events/:eventId
  * Update event — ADMIN ONLY
+ * Supports multipart/form-data with images[] files OR JSON body with image URLs
  */
 exports.updateEvent = async (req, res) => {
   try {
@@ -123,17 +156,22 @@ exports.updateEvent = async (req, res) => {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Event not found' } });
     }
 
-    const fields = [
-      'title', 'description', 'short_description', 'category', 'location', 'city',
-      'lat', 'lng', 'start_date', 'end_date', 'images', 'cover_image',
-      'ticket_url', 'price', 'is_free', 'is_featured', 'is_published', 'tags'
-    ];
+    // Resolve new images if provided
+    let newImages = null;
+    try {
+      newImages = await resolveImages(req);
+    } catch (uploadErr) {
+      return res.status(uploadErr.status || 503).json({
+        success: false,
+        error: { code: uploadErr.code || 'UPLOAD_FAILED', message: uploadErr.message }
+      });
+    }
 
     const bodyMap = {
       title: 'title', description: 'description', shortDescription: 'short_description',
       category: 'category', location: 'location', city: 'city',
       lat: 'lat', lng: 'lng', startDate: 'start_date', endDate: 'end_date',
-      images: 'images', coverImage: 'cover_image', ticketUrl: 'ticket_url',
+      coverImage: 'cover_image', ticketUrl: 'ticket_url',
       price: 'price', isFree: 'is_free', isFeatured: 'is_featured',
       isPublished: 'is_published', tags: 'tags'
     };
@@ -142,7 +180,17 @@ exports.updateEvent = async (req, res) => {
       if (req.body[bodyKey] !== undefined) event[dbKey] = req.body[bodyKey];
     });
 
+    // Apply new images if provided (replaces existing)
+    if (newImages !== null) {
+      event.images = newImages;
+      // Auto-set cover to first image if not explicitly provided
+      if (!req.body.coverImage && newImages.length > 0) {
+        event.cover_image = newImages[0];
+      }
+    }
+
     await event.save();
+    logger.info('Event updated', { eventId: event.event_id, adminId: req.user.user_id, newImageCount: newImages?.length });
     res.json({ success: true, data: formatEvent(event) });
   } catch (error) {
     logger.error('Update event error', { error: error.message });
