@@ -1,8 +1,16 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const logger = require('../utils/logger');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.EMAIL_FROM || 'EgyTravel <onboarding@resend.dev>';
+// Gmail SMTP transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD
+  }
+});
+
+const FROM = `EgyTravel <${process.env.GMAIL_USER}>`;
 
 // ─── HTML Templates ───────────────────────────────────────────────────────────
 
@@ -124,16 +132,14 @@ function passwordResetTemplate(name, resetCode) {
 
 async function sendOTPEmail(to, name, otp) {
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from: FROM,
       to,
       subject: `${otp} — Your EgyTravel verification code`,
       html: otpTemplate(name, otp)
     });
-
-    if (error) throw new Error(error.message);
-    logger.info('OTP email sent', { to, messageId: data?.id });
-    return { success: true, messageId: data?.id };
+    logger.info('OTP email sent', { to, messageId: info.messageId });
+    return { success: true, messageId: info.messageId };
   } catch (error) {
     logger.error('Failed to send OTP email', { to, error: error.message });
     throw error;
@@ -142,16 +148,14 @@ async function sendOTPEmail(to, name, otp) {
 
 async function sendWelcomeEmail(to, name) {
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from: FROM,
       to,
       subject: `Welcome to EgyTravel, ${name}! 🏺`,
       html: welcomeTemplate(name)
     });
-
-    if (error) throw new Error(error.message);
-    logger.info('Welcome email sent', { to, messageId: data?.id });
-    return { success: true, messageId: data?.id };
+    logger.info('Welcome email sent', { to, messageId: info.messageId });
+    return { success: true, messageId: info.messageId };
   } catch (error) {
     logger.error('Failed to send welcome email', { to, error: error.message });
     // Don't throw — welcome email failure shouldn't block registration
@@ -161,16 +165,14 @@ async function sendWelcomeEmail(to, name) {
 
 async function sendPasswordResetEmail(to, name, resetCode) {
   try {
-    const { data, error } = await resend.emails.send({
+    const info = await transporter.sendMail({
       from: FROM,
       to,
       subject: `Reset your EgyTravel password`,
       html: passwordResetTemplate(name, resetCode)
     });
-
-    if (error) throw new Error(error.message);
-    logger.info('Password reset email sent', { to, messageId: data?.id });
-    return { success: true, messageId: data?.id };
+    logger.info('Password reset email sent', { to, messageId: info.messageId });
+    return { success: true, messageId: info.messageId };
   } catch (error) {
     logger.error('Failed to send password reset email', { to, error: error.message });
     throw error;
