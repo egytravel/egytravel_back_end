@@ -1,206 +1,186 @@
-# EgyTravel Authentication Backend
+# EgyTravel — Egyptian Tourism Platform Backend
 
-🚀 **Production-ready authentication and authorization backend service for the EgyTravel tourism platform.**
+> RESTful API backend for EgyTravel, a full-stack Egyptian tourism platform serving a Flutter mobile app and a React web application.
 
-## ✨ Features
+**Live API:** https://egy-travel-89eca3b6683d.herokuapp.com  
+**Website:** https://egytravel.me  
+**Health Check:** https://egy-travel-89eca3b6683d.herokuapp.com/health
 
-- 🔐 JWT-based authentication with refresh tokens
-- 👥 Role-based authorization (User/Admin)
-- 🗄️ MySQL database with Sequelize ORM
-- 🔄 Password reset functionality
-- 🛡️ Rate limiting and security middleware
-- 📝 Comprehensive logging with Winston
-- 🚦 Input validation and sanitization
-- 🔒 Password hashing with bcrypt
+---
 
-## 🛠️ Tech Stack
+## Overview
 
-- **Runtime**: Node.js >= 16.0.0
-- **Framework**: Express.js
-- **Database**: MySQL (Railway hosted)
-- **ORM**: Sequelize
-- **Authentication**: JWT (jsonwebtoken)
-- **Security**: Helmet, CORS, Rate limiting
-- **Validation**: express-validator
-- **Logging**: Winston
+EgyTravel is a graduation project that helps users explore Egypt, plan trips, search hotels and flights, and connect with a travel community. This repository contains the backend API built with Node.js and Express.
 
-## 🚀 Quick Start
+---
 
-### 1. Clone the repository
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Node.js 18+ |
+| Framework | Express.js |
+| SQL Database | PostgreSQL (Heroku Postgres / Amazon RDS) |
+| NoSQL Database | MongoDB Atlas |
+| ORM / ODM | Sequelize + Mongoose |
+| Authentication | JWT + bcrypt |
+| File Upload | Multer + Cloudinary |
+| Email | Nodemailer (Gmail SMTP) |
+| Deployment | Heroku |
+| Security | Helmet.js, CORS, express-rate-limit |
+
+---
+
+## Modules
+
+| Module | Endpoints | Description |
+|--------|-----------|-------------|
+| Authentication | `/api/auth` | Register, login, OTP verification, password reset |
+| Users | `/api/users` | Profile management, admin controls |
+| Home | `/api/home` | Dynamic homepage data, destinations, cities |
+| Explore | `/api/explore` | Tourist attractions via OpenTripMap |
+| Flights | `/api/flights` | Flight search via Booking.com (RapidAPI) |
+| Hotels | `/api/hotels` | Hotel search via Booking.com (RapidAPI) |
+| Bookings | `/api/bookings` | Hotel & flight reservation management |
+| Favorites | `/api/favorites` | Saved destinations |
+| Reviews | `/api/reviews` | Ratings & user feedback |
+| Trips | `/api/trips` | Manual & AI-generated trip planning |
+| Events | `/api/events` | What's On — admin-managed local events |
+| Community | `/api/community` | Posts, likes, comments feed |
+| AI | `/api/ai` | Save AI-generated trip itineraries |
+
+---
+
+## External APIs
+
+| API | Purpose |
+|-----|---------|
+| Booking.com (RapidAPI) | Hotels & flights search |
+| Google Places API | Destination photos, reviews, ratings |
+| OpenTripMap | Tourist attractions & points of interest |
+| Wikipedia | Destination descriptions & summaries |
+| Cloudinary | Image upload & CDN storage |
+| Resend | Transactional email (OTP, welcome, password reset) |
+
+---
+
+## Database Architecture
+
+**PostgreSQL** — structured relational data:
+- users, trips, trip_days, bookings, favorites, events, reviews, posts, notifications, places
+
+**MongoDB** — flexible/social data:
+- email_otps, posts, reviews, ai_conversations, ai_trip_plans, place_cache, search_history
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- npm
+
+### Setup
+
 ```bash
-git clone https://github.com/yourusername/egytravel-auth-backend.git
-cd egytravel-auth-backend
-```
+# 1. Clone the repository
+git clone <repo-url>
+cd egytravel_back_end
 
-### 2. Install dependencies
-```bash
+# 2. Install dependencies
 npm install
-```
 
-### 3. Configure environment variables
-```bash
+# 3. Configure environment variables
 cp .env.example .env
-# Edit .env with your database credentials and JWT secrets
-```
+# Fill in your values in .env
 
-### 4. Start the server
-```bash
-# Development
+# 4. Start development server
 npm run dev
-
-# Production
-npm start
 ```
 
-## 📡 API Endpoints
+Server runs at `http://localhost:3000`
 
-### 🔐 Authentication
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/api/auth/register` | User registration | ❌ |
-| POST | `/api/auth/login` | User login | ❌ |
-| POST | `/api/auth/logout` | User logout | ✅ |
-| POST | `/api/auth/refresh` | Refresh access token | ❌ |
-| POST | `/api/auth/forgot-password` | Request password reset | ❌ |
-| POST | `/api/auth/reset-password` | Reset password | ❌ |
-| GET | `/api/auth/me` | Get current user | ✅ |
+### Environment Variables
 
-### 👤 User Management
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/users/profile` | Get user profile | ✅ |
-| PUT | `/api/users/profile` | Update user profile | ✅ |
-| POST | `/api/users/change-password` | Change password | ✅ |
+See `.env.example` for all required variables including:
+- `DATABASE_URL` — PostgreSQL connection string
+- `MONGODB_URI` — MongoDB Atlas URI
+- `JWT_SECRET` — JWT signing secret
+- `GMAIL_USER` + `GMAIL_APP_PASSWORD` — email credentials
+- `CLOUDINARY_*` — Cloudinary credentials
+- `RAPIDAPI_KEY` — Booking.com API key
+- `GOOGLE_PLACES_API_KEY` — Google Places key
+- `OPENTRIPMAP_API_KEY` — OpenTripMap key
 
-### 👑 Admin Only
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/users/admin/users` | List all users | ✅ Admin |
-| GET | `/api/users/admin/users/:id` | Get user by ID | ✅ Admin |
-| PUT | `/api/users/admin/users/:id/role` | Update user role | ✅ Admin |
-| DELETE | `/api/users/admin/users/:id` | Delete user | ✅ Admin |
+---
 
-### 🏥 Health Check
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/health` | Server health status | ❌ |
+## API Response Format
 
-## 🔧 Environment Variables
+All endpoints return a consistent JSON structure:
 
-Create a `.env` file based on `.env.example`:
-
-```env
-# Database Configuration
-DB_HOST=your-railway-db-host
-DB_PORT=your-railway-db-port
-DB_NAME=your-database-name
-DB_USER=your-database-user
-DB_PASSWORD=your-database-password
-
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRES_IN=15m
-JWT_REFRESH_SECRET=your-refresh-token-secret
-JWT_REFRESH_EXPIRES_IN=7d
-
-# Server Configuration
-PORT=3000
-NODE_ENV=production
-```
-
-## 🚀 Deployment to Railway
-
-### 1. Push to GitHub
-```bash
-git init
-git add .
-git commit -m "Initial commit: EgyTravel Auth Backend"
-git branch -M main
-git remote add origin https://github.com/yourusername/egytravel-auth-backend.git
-git push -u origin main
-```
-
-### 2. Deploy on Railway
-1. Go to [Railway.app](https://railway.app)
-2. Click "New Project" → "Deploy from GitHub repo"
-3. Select your repository
-4. Railway will auto-detect Node.js and deploy
-5. Add environment variables in Railway dashboard
-6. Your API will be available at: `https://your-app-name.up.railway.app`
-
-## 🧪 Testing
-
-### Using Postman
-Import the API endpoints and test with:
-- Base URL: `http://localhost:3000` (development)
-- Base URL: `https://your-app-name.up.railway.app` (production)
-
-### Sample Registration Request
 ```json
-POST /api/auth/register
-Content-Type: application/json
-
 {
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "SecurePass123!",
-  "role": "user"
+  "success": true,
+  "data": { ... }
 }
 ```
 
-## 📁 Project Structure
+Error responses:
 
-```
-├── src/
-│   ├── config/          # Database and JWT configuration
-│   ├── controllers/     # Route handlers (placeholder)
-│   ├── middleware/      # Authentication and validation
-│   ├── migrations/      # Database migrations
-│   ├── models/sql/      # Sequelize models
-│   ├── routes/          # API routes
-│   ├── services/        # Business logic services
-│   └── utils/           # Utility functions and logging
-├── logs/                # Application logs
-├── .env.example         # Environment variables template
-├── .gitignore          # Git ignore rules
-├── package.json        # Dependencies and scripts
-├── railway.json        # Railway deployment config
-├── README.md           # This file
-└── server.js           # Application entry point
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human readable message"
+  }
+}
 ```
 
-## 🔒 Security Features
+---
 
-- ✅ Password hashing with bcrypt (12 salt rounds)
-- ✅ JWT tokens with expiration
-- ✅ Rate limiting on authentication endpoints
-- ✅ Input validation and sanitization
-- ✅ CORS protection
-- ✅ Security headers with Helmet
-- ✅ SQL injection prevention with Sequelize
-- ✅ Environment variable protection
+## Security
 
-## 📝 Scripts
+- JWT authentication with 365-day expiry
+- bcrypt password hashing (12 salt rounds)
+- Helmet.js HTTP security headers
+- Rate limiting (1000 req / 15 min per IP)
+- Input validation via express-validator
+- SSL enforced on all database connections
+- Role-based access control (user / admin)
+
+---
+
+## Deployment
+
+The API is deployed on **Heroku** (Heroku-24 stack). Push to deploy:
 
 ```bash
-npm start          # Start production server
-npm run dev        # Start development server with nodemon
-npm test           # Run tests (when implemented)
-npm run build      # No build step required
+git push heroku main
 ```
 
-## 🤝 Contributing
+---
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+## Project Structure
 
-## 📄 License
+```
+src/
+├── config/         # Database & JWT config
+├── controllers/    # Business logic
+├── middleware/     # Auth, validation, rate limiting
+├── migrations/     # PostgreSQL migrations
+├── models/
+│   ├── sql/        # Sequelize models
+│   └── nosql/      # Mongoose models
+├── routes/         # Express route definitions
+├── services/       # External API integrations
+├── utils/          # Logger, validators, helpers
+└── data/           # Static destination data
+```
 
-This project is licensed under the MIT License.
+---
 
-## 🆘 Support
+## Team
 
-For support, email support@egytravel.com or create an issue in this repository.
+Built as a graduation project.  
+Backend developed by **Fares Iraqi** — Backend Developer & Team Leader.
